@@ -264,7 +264,8 @@ const Live = (() => {
     for (let i = -15; i <= 2; i++) { const s = new Date(thisMon); s.setDate(s.getDate() + i * 7); weeks.push(Object.assign(week(s), { future: i > 0, current: i === 0 })); }
     const W0 = weeks[15], Wm1 = weeks[14], Wp1 = weeks[16];
     const last4 = weeks.slice(11, 15), l4min = last4.reduce((s, w) => s + w.min, 0), l4n = last4.reduce((s, w) => s + w.n, 0), l4t = last4.reduce((s, w) => s + w.t, 0);
-    const trainTxt = w => w.min ? ` · davon ${de0.format(w.t / w.min * 100)} % eigenes Training` : '';
+    const ph = w => w.n ? `<b>${de1.format(w.min / 60).replace(/,0$/, '')} von ${de0.format(w.n * cap / 60)} Platzstunden</b>` : 'noch keine Daten';
+    const trainTxt = w =>w.min ? ` · davon ${de0.format(w.t / w.min * 100)} % eigenes Training` : '';
     const fmtW = w => `${w.start.getDate()}.${w.start.getMonth() + 1}.`;
     const tile = (l, p, sub, k) => `<article class="tile"><div class="label"><i class="sw" style="--k:${k}"></i>${l}</div><div class="value num">${p === null ? '–' : pct0(p)}</div><div class="what">${sub}</div></article>`;
     const hours = (H.close - H.open) / 60, oh = Math.floor(H.open / 60);
@@ -283,9 +284,9 @@ const Live = (() => {
     const since = H.since ? new Date(H.since + 'T12:00:00') : null;
     const missing = !since || since > weeks[0].start;
     host.innerHTML = head('Hallenauslastung', `Alle Belegungen aus eBuSy (Einzel- und Abobuchungen, auch von Externen, plus eigenes Training) auf ${H.courts} Plätzen, gezählt ${String(oh).padStart(2, '0')}–${Math.ceil(H.close / 60)} Uhr. 100 % = jede Stunde auf jedem Platz belegt.`) +
-      `<section class="tiles">${tile('Diese Woche', W0.p, `ab ${fmtW(W0)}, inkl. schon gebuchter Tage${trainTxt(W0)}`, 'var(--accent)')}
-        ${tile('Letzte Woche', Wm1.p, `ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)')}
-        ${tile('Nächste Woche', Wp1.p, 'schon gebucht', 'var(--in)')}
+      `<section class="tiles">${tile('Diese Woche', W0.p, `${ph(W0)} · ab ${fmtW(W0)}, inkl. schon gebuchter Tage${trainTxt(W0)}`, 'var(--accent)')}
+        ${tile('Letzte Woche', Wm1.p, `${ph(Wm1)} · ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)')}
+        ${tile('Nächste Woche', Wp1.p, `${ph(Wp1)} · schon gebucht`, 'var(--in)')}
         ${tile('Letzte 4 Wochen', l4n ? l4min / (l4n * cap) * 100 : null, `${de0.format(l4min / 60)} von ${de0.format(l4n * cap / 60)} Platzstunden${l4min ? ' · davon ' + de0.format(l4t / l4min * 100) + ' % Training' : ''}`, 'var(--c-pers)')}</section>
       <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>
       <section class="panel"><div><h2>Wann ist die Halle voll?</h2><p class="explain">Durchschnittliche Belegung je Wochentag und Uhrzeit: letzte 8 Wochen und schon gebuchte kommende 2 Wochen, soweit gespeichert. Je dunkler, desto voller.</p></div>${heatHtml}</section>`;
