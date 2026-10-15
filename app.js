@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '6';
+const APP_VERSION = '7';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -296,7 +296,7 @@ function openCompany(id, year) {
 }
 
 // Firmen, für die es in icons/ einen Schriftzug gibt (logo-<id>.png, siehe styles.css)
-const WORDMARKS = ['tennis'];
+const WORDMARKS = ['tennis', 'fitness'];
 
 // Reiter: „Finanzen“ kommt aus der BWA, die übrigen sind Live-Daten aus Google Drive / eBuSy
 const TABS = {

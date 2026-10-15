@@ -297,7 +297,8 @@ table.hgrid th { text-align: center; padding: 0 4px 6px; }
 
 /* Firmen-Logo als Schriftzug (Maske, damit es in hell und dunkel die Textfarbe annimmt) */
 .wordmark { display: block; height: 30px; aspect-ratio: 2000 / 165; max-width: 100%; background: var(--ink); -webkit-mask: var(--logo) no-repeat left center / contain; mask: var(--logo) no-repeat left center / contain; }
-.wordmark-tennis { --logo: url("icons/logo-tennis.png"); }
+.wordmark-tennis { --logo: url("icons/logo-tennis.png"); aspect-ratio: 2000 / 165; }
+.wordmark-fitness { --logo: url("icons/logo-fitness.png"); aspect-ratio: 2080 / 168; }
 .has-wordmark .logo { display: none; }
 .has-wordmark .brand > div:not(.logo) { display: grid; gap: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
