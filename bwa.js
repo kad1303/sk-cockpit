@@ -103,7 +103,11 @@ const BWA = (() => {
       const bad = REQUIRED.filter(k => !near(rows[k].slice(0, n).reduce((a, b) => a + b, 0), rows[k][n]));
       checks.push({ ok: !bad.length, text: 'Kumulierte Spalte = Summe der Monate' + (bad.length ? ' — Abweichung bei ' + bad.length + ' Zeilen' : '') });
     }
-    return { firma, stand: stand || (ML[months[n - 1]] + ' ' + year), erstellt: erstellt || null, year, months, rows: out, checks };
+    // Leere Monate am Jahresanfang weglassen (z. B. Firma erst im März gestartet)
+    let skip = 0;
+    while (skip < n - 1 && Object.values(out).every(arr => arr[skip] === 0)) skip++;
+    if (skip) for (const k in out) out[k] = out[k].slice(skip);
+    return { firma, stand: stand || (ML[months[n - 1]] + ' ' + year), erstellt: erstellt || null, year, months: months.slice(skip), rows: out, checks };
   }
 
   async function read(file) { return parse(await extractLines(file)); }

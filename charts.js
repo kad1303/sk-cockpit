@@ -116,6 +116,7 @@ const Fin = (() => {
     const E = S('ein', p), A = S('aus', p), R = S('erg', p), r100 = R / E * 100;
     const prev = p !== 'cum' && p > 0 ? p - 1 : null;
     const cmpPct = (cur, old, good, what) => {
+      if (!old) return `<span class="cmp">${what}: ${eur(old)}</span>`;
       const d = (cur / old - 1) * 100;
       const cls = d * good > 0 ? 'up' : d * good < 0 ? 'down' : '';
       return `<span class="${cls}">${d > 0 ? '▲' : d < 0 ? '▼' : ''} ${sgn(d, x => de1.format(x))} %</span><span class="cmp">ggü. ${what}</span>`;
@@ -292,7 +293,7 @@ const Fin = (() => {
     if (streak >= 2) items.push(['crit', '−', `<b>Seit ${ml(N - streak)} jeden Monat Verlust,</b> zusammen ${eurS(sum(B.erg.slice(N - streak)))}.`]);
     else if (neg) items.push(['warn', '!', `<b>${neg} von ${N} Monaten mit Verlust.</b> ${ml(L)}: ${eurS(B.erg[L])}.`]);
     else items.push(['good', '✓', `<b>Jeder Monat mit Gewinn.</b>`]);
-    const pq = B.personal.map((v, i) => v / B.ein[i] * 100);
+    const pq = B.personal.map((v, i) => B.ein[i] ? v / B.ein[i] * 100 : 0);
     const pmax = pq.indexOf(Math.max(...pq));
     items.push(['info', 'i', `<b>Größter Ausgabenposten ist das Personal:</b> von 100 € Einnahmen gehen ${de0.format(qe('personal', 'cum'))} € in Löhne und Gehälter, im ${ml(pmax)} sogar ${de0.format(pq[pmax])} €.`]);
     if (N > 1) {
@@ -302,7 +303,7 @@ const Fin = (() => {
         `<b>Einnahmen im ${ml(L)}: ${eur(B.ein[L])}${isMin ? ', so wenig wie in keinem anderen Monat' : ''}.</b> Das sind ${pct(Math.abs(d))} ${d < 0 ? 'weniger' : 'mehr'} als im Schnitt (${eur(avg)}).`]);
     }
     const med = a => { const s = a.slice().sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
-    const wq = B.waren.map((v, i) => v / B.ein[i] * 100), wavg = qe('waren', 'cum'), wm = med(B.werbe);
+    const wq = B.waren.map((v, i) => B.ein[i] ? v / B.ein[i] * 100 : 0), wavg = qe('waren', 'cum'), wm = med(B.werbe);
     const fx = [];
     B.ein.forEach((_, i) => {
       if (wq[i] > wavg + 4) fx.push(`${eur(B.waren[i])} Wareneinkauf im ${ml(i)}`);
