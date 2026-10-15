@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '2';
+const APP_VERSION = '3';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -148,7 +148,7 @@ function renderPicker() {
 
 function appbar(withSwitch) {
   const sw = withSwitch ? `<div class="seg-switch" role="group" aria-label="Firma">${state.companies.map(c =>
-    `<button data-switch="${esc(c.id)}" aria-pressed="${c.id === state.company}">${esc(c.short.replace(/^SK /, ''))}</button>`).join('')}</div>` : '';
+    `<button data-switch="${esc(c.id)}" aria-pressed="${c.id === state.company}">${esc(c.short)}</button>`).join('')}</div>` : '';
   return `<div class="appbar"><div class="appbar-in">
     <span class="name">SK Cockpit</span>${sw}
     ${withSwitch ? `<button class="icon-btn" id="to-picker" aria-label="Firmenübersicht" title="Firmenübersicht">${ICON.grid}</button>` : ''}

@@ -238,7 +238,7 @@ const Fin = (() => {
     const host = $('result');
     host.innerHTML = '';
     const W = Math.max(host.clientWidth, 280), H = W < 500 ? 250 : 290;
-    const m = { t: 14, r: 12, b: 26, l: 52 };
+    const m = { t: 30, r: 12, b: 26, l: 52 };
     const iw = W - m.l - m.r, ih = H - m.t - m.b;
     const lo = Math.min(0, ...B.erg, ...cum), hi = Math.max(0, ...B.erg, ...cum);
     const step = niceStep((hi - lo) || 1, 5);
@@ -257,7 +257,9 @@ const Fin = (() => {
     const cpath = cum.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
     el('path', { d: cpath, fill: 'none', stroke: 'var(--ink)', 'stroke-width': 2, 'stroke-dasharray': '5 4', 'stroke-linejoin': 'round' }, svg);
     el('circle', { cx: x(N - 1), cy: y(cum[N - 1]), r: 4, fill: 'var(--ink)', stroke: 'var(--card)', 'stroke-width': 2 }, svg);
-    txt({ x: x(N - 1) - 8, y: y(cum[N - 1]) - 9, 'text-anchor': 'end', style: 'fill: var(--ink); font-weight: 600; font-size: 12px' }, 'zusammen ' + eurS(cum[N - 1]), svg);
+    // Summe oben rechts über der Grafik, damit sie nie in Balken oder Linie steht
+    const tot = cum[N - 1];
+    txt({ x: W - m.r, y: 14, 'text-anchor': 'end', style: `fill: var(${tot >= 0 ? '--good' : '--crit'}); font-weight: 600; font-size: 12px` }, 'seit Januar zusammen: ' + eurS(tot), svg);
     const tip = makeTip(host);
     const hit = el('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' }, svg);
     const hov = el('rect', { y: m.t, height: ih, width: iw / N, fill: 'var(--hl)', opacity: 0, 'pointer-events': 'none' }, svg);
