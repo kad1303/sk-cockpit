@@ -9,7 +9,7 @@
 const Live = (() => {
   const URL_ = (window.SK_CONFIG || {}).live || '';
   let data = null, loadedAt = 0, loading = null;
-  const ui = { umsatz: {}, trainer: {}, training: {} };
+  const ui = { umsatz: {}, trainer: {} };
   const $ = id => document.getElementById(id);
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs, parent) => {
@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], training: ['fitness', 'trainer'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -82,7 +82,7 @@ const Live = (() => {
   }
 
   function draw(tab, company, host) {
-    const part = { umsatz: 'umsatz', trainer: 'trainer', halle: 'halle', training: 'fitness' }[tab];
+    const part = tab;
     if (data[part] && data[part].error) {
       host.innerHTML = `<section class="panel empty"><h2>Fehler beim Lesen</h2><p class="sub">${esc(data[part].error)}</p></section>`;
       return;
@@ -90,7 +90,6 @@ const Live = (() => {
     if (tab === 'umsatz') drawUmsatz(company, host);
     if (tab === 'trainer') drawTrainer(company, host, 'Trainerauslastung');
     if (tab === 'halle') drawHalle(host);
-    if (tab === 'training') drawTraining(host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
@@ -138,41 +137,10 @@ const Live = (() => {
             <span class="mix-pct num">${de1.format(share)} %</span><span class="mix-eur num">${eur(r.v)}</span>
             <span class="mix-py num ${d === null ? '' : d >= 0 ? 'up' : 'down'}">${d === null ? '' : (d >= 0 ? '▲ +' : '▼ −') + de0.format(Math.abs(d)) + ' %'}</span></li>`;
         }).join('')}</ul>
-        <p class="hint">▲▼ = Veränderung zum gleichen Zeitraum im Vorjahr.</p></section>
-      <section class="panel"><div><h2>Anteile je Monat</h2><p class="explain">Jede Säule ist ein Monat (100 %). So sieht man, wie sich die Mischung im Jahr verschiebt.</p></div>
-        <div class="legend">${big.map((r, i) => `<span><i class="sw" style="--k:${PALETTE[i % PALETTE.length]}"></i>${esc(r.name)}</span>`).join('')}</div>
-        <div class="chart" id="u-stack"></div></section>`;
+        <p class="hint">▲▼ = Veränderung zum gleichen Zeitraum im Vorjahr.</p></section>`;
     if ($('u-year')) { $('u-year').value = String(year); $('u-year').addEventListener('change', e => { st.year = +e.target.value; st.period = 'cum'; drawUmsatz(company, host); bindRefresh(host, 'umsatz', company); }); }
     $('u-period').value = String(period);
     $('u-period').addEventListener('change', e => { st.period = e.target.value === 'cum' ? 'cum' : +e.target.value; drawUmsatz(company, host); bindRefresh(host, 'umsatz', company); });
-    // 100%-Säulen je Monat
-    const names = big.map(r => r.name), smallNames = small.map(r => r.name);
-    const series = monthsWithData.map(m => {
-      const vals = names.map(n => n === 'Weitere' ? groups.filter(g => smallNames.includes(g.name)).reduce((s, g) => s + g.values[m], 0) : (groups.find(g => g.name === n) || { values: [] }).values[m] || 0);
-      return { m, vals, sum: vals.reduce((a, b) => a + b, 0) };
-    });
-    stack100($('u-stack'), series, names, period);
-  }
-
-  function stack100(host, series, names, sel) {
-    const W = Math.max(host.clientWidth, 300), H = 240, m = { t: 8, r: 8, b: 24, l: 40 };
-    const iw = W - m.l - m.r, ih = H - m.t - m.b, slot = iw / Math.max(series.length, 1), bw = Math.min(38, slot * 0.7);
-    const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': 'Anteile je Monat' }, host);
-    [0, 50, 100].forEach(p => {
-      const y = m.t + ih - p / 100 * ih;
-      el('line', { x1: m.l, x2: W - m.r, y1: y, y2: y, stroke: 'var(--grid)' }, svg);
-      txt({ x: m.l - 6, y: y + 4, 'text-anchor': 'end' }, p + ' %', svg);
-    });
-    series.forEach((s, i) => {
-      const x = m.l + i * slot + (slot - bw) / 2;
-      let y = m.t + ih;
-      s.vals.forEach((v, k) => {
-        const h = s.sum ? v / s.sum * ih : 0;
-        if (h > 0) { const r = el('rect', { x, y: y - h, width: bw, height: Math.max(h - 1, 0), fill: PALETTE[k % PALETTE.length], opacity: sel === 'cum' || sel === s.m ? 1 : 0.35 }, svg); el('title', {}, r).textContent = `${ML[s.m]}: ${names[k]} ${de1.format(v / s.sum * 100)} % (${eur(v)})`; }
-        y -= h;
-      });
-      txt({ x: x + bw / 2, y: H - 6, 'text-anchor': 'middle' }, MS[s.m], svg);
-    });
   }
 
   // ---------- Trainerauslastung ----------
@@ -195,22 +163,12 @@ const Live = (() => {
         <span class="num tr-val">${h1(r.ist)}${r.soll ? ` <small>/ ${h1(r.soll)}</small>` : ''}</span>
         <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
     }).join('');
-    // Verlauf: Auslastung je Trainer und Monat
-    const grid = `<div class="tbl-wrap"><table class="heat"><thead><tr><th>Trainer</th>${months.map((x, i) => `<th class="r${i === sel ? ' sel' : ''}">${MS[x.m]}${x.m === 0 || i === 0 ? ' ' + String(x.y).slice(2) : ''}</th>`).join('')}</tr></thead><tbody>` +
-      rows.map(r => `<tr><td>${esc(r.name)}</td>${r.ist.map((v, i) => {
-        if (v === null) return `<td class="r${i === sel ? ' sel' : ''}"></td>`;
-        if (!r.soll) return `<td class="r num${i === sel ? ' sel' : ''}">${de0.format(v)} h</td>`;
-        const f = i === curIdx ? Math.min(1, now.getDate() / new Date(months[i].y, months[i].m + 1, 0).getDate()) : 1;
-        const p = v / (r.soll * f) * 100;
-        return `<td class="r num ${p >= 95 ? 'h-good' : p >= 80 ? 'h-warn' : 'h-crit'}${i === sel ? ' sel' : ''}">${de0.format(p)} %</td>`;
-      }).join('')}</tr>`).join('') + '</tbody></table></div>';
     return {
       controls: `<select id="${idPrefix}-month" aria-label="Monat">${opts}</select>`,
       html: `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
           ${tSoll ? `<span class="sub">Team: ${h1(tIst)} von ${h1(tSoll)} · <b>${pct0(tIst / tSoll * 100)}</b></span>` : ''}</div>
           <ul class="trainers">${bars || '<li class="sub">Keine Stundenliste für diesen Monat gefunden.</li>'}</ul>
-          <p class="hint">Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll${isCur ? ' (anteilig bis heute)' : ''}. Grün ab 95 %, gelb ab 80 %.</p></section>
-        <section class="panel"><div><h2>Verlauf</h2><p class="explain">Auslastung gegenüber Soll je Monat. Ohne Soll werden die Stunden gezeigt.</p></div>${grid}</section>`,
+          <p class="hint">Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll${isCur ? ' (anteilig bis heute)' : ''}. Grün ab 95 %, gelb ab 80 %.</p></section>`,
       bind: redraw => { const s = $(idPrefix + '-month'); s.value = String(sel); s.addEventListener('change', e => { st.month = +e.target.value; redraw(); }); },
     };
   }
@@ -222,28 +180,6 @@ const Live = (() => {
     const b = trainerBlock(rows, T.months, st, 'tr');
     host.innerHTML = head('Trainerauslastung', 'Gearbeitete Stunden aus „SK – Stundenlisten“ gegenüber den Soll-Stunden. Soll-Stunden lassen sich in der Einstellungs-Tabelle in Google Drive ändern.', b.controls) + b.html;
     b.bind(() => { drawTrainer(company, host); bindRefresh(host, 'trainer', company); });
-  }
-
-  // ---------- Fitness: Training ----------
-  function drawTraining(host) {
-    const F = data.fitness, T = data.trainer;
-    const st = ui.training;
-    const rows = T && T.rows ? T.rows.filter(r => r.co === 'fitness') : [];
-    const b = trainerBlock(rows, T.months, st, 'ft');
-    const ms = F.months, D = F.data;
-    const sel = st.month === undefined ? ms.length - 2 : st.month;
-    const cur = D[sel], prev = D[sel - 1];
-    const delta = (a, b2, f) => (a && b2 && b2[f]) ? `<span class="${a[f] >= b2[f] ? 'up' : 'down'}">${a[f] >= b2[f] ? '▲' : '▼'} ${f === 'umsatz' ? eurS(a[f] - b2[f]) : sgn(a[f] - b2[f], x => de0.format(x))}</span><span class="cmp">ggü. ${MS[ms[sel - 1].m]}</span>` : '';
-    const tiles = cur ? [
-      ['Kunden mit Training', de0.format(cur.kunden), delta(cur, prev, 'kunden'), 'var(--c-pers)'],
-      ['Einheiten', de0.format(cur.einheiten), delta(cur, prev, 'einheiten'), 'var(--in)'],
-      ['Trainingsumsatz', eur(cur.umsatz), delta(cur, prev, 'umsatz'), 'var(--accent)'],
-    ].map(([l, v, d, k]) => `<article class="tile"><div class="label"><i class="sw" style="--k:${k}"></i>${l}</div><div class="value num">${v}</div><div class="delta">${d}</div></article>`).join('') : '<p class="sub">Keine Abrechnung für diesen Monat gefunden.</p>';
-    host.innerHTML = head('Training Fitness', 'Kunden, Einheiten und Umsatz aus der „Trainingsabrechnung Fitness“, dazu die Auslastung laut Stundenliste.', b.controls) +
-      `<section class="tiles tiles-3">${tiles}</section>
-       <section class="panel"><div><h2>Trainingsumsatz je Monat</h2><p class="explain">Rechnungssumme aller Kunden laut Trainingsabrechnung. Die Zahl über der Säule ist die Anzahl Kunden.</p></div><div class="chart" id="ft-chart"></div></section>` + b.html;
-    b.bind(() => { drawTraining(host); bindRefresh(host, 'training'); });
-    bars($('ft-chart'), ms.map((x, i) => ({ label: MS[x.m], v: D[i] ? D[i].umsatz : 0, top: D[i] ? de0.format(D[i].kunden) : '', hl: i === sel })), v => tsd(v));
   }
 
   // ---------- Halle ----------
@@ -268,19 +204,7 @@ const Live = (() => {
     const trainTxt = w =>w.min ? ` · davon ${de0.format(w.t / w.min * 100)} % eigenes Training` : '';
     const fmtW = w => `${w.start.getDate()}.${w.start.getMonth() + 1}.`;
     const tile = (l, p, sub, k) => `<article class="tile"><div class="label"><i class="sw" style="--k:${k}"></i>${l}</div><div class="value num">${p === null ? '–' : pct0(p)}</div><div class="what">${sub}</div></article>`;
-    const hours = (H.close - H.open) / 60, oh = Math.floor(H.open / 60);
-    // Wochentag × Stunde, letzte 8 abgeschlossene Wochen
-    const heat = Array.from({ length: 7 }, () => new Array(Math.ceil(hours)).fill(0)), cnt = new Array(7).fill(0);
-    for (let i = -14; i <= 56; i++) {
-      const d = new Date(today); d.setDate(d.getDate() - i);
-      const r = byDate[iso(d)]; if (!r) continue;
-      const wd = (d.getDay() + 6) % 7; cnt[wd]++;
-      r.h.forEach((m, k) => { if (k < heat[wd].length) heat[wd][k] += m; });
-    }
-    const WD = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
-    const heatHtml = `<div class="tbl-wrap"><table class="heat hgrid"><thead><tr><th></th>${heat[0].map((_, k) => `<th>${oh + k}</th>`).join('')}</tr></thead><tbody>` +
-      heat.map((row, wd) => `<tr><td>${WD[wd]}</td>${row.map(m => { const p = cnt[wd] ? m / (cnt[wd] * H.courts * 60) * 100 : 0; return `<td class="hc" style="--a:${Math.min(1, p / 100)}" title="${WD[wd]} ${pct0(p)}">${cnt[wd] ? de0.format(p) : ''}</td>`; }).join('')}</tr>`).join('') +
-      '</tbody></table></div>';
+    const oh = Math.floor(H.open / 60);
     const since = H.since ? new Date(H.since + 'T12:00:00') : null;
     const missing = !since || since > weeks[0].start;
     host.innerHTML = head('Hallenauslastung', `Alle Belegungen aus eBuSy (Einzel- und Abobuchungen, auch von Externen, plus eigenes Training) auf ${H.courts} Plätzen, gezählt ${String(oh).padStart(2, '0')}–${Math.ceil(H.close / 60)} Uhr. 100 % = jede Stunde auf jedem Platz belegt.`) +
@@ -288,8 +212,7 @@ const Live = (() => {
         ${tile('Letzte Woche', Wm1.p, `${ph(Wm1)} · ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)')}
         ${tile('Nächste Woche', Wp1.p, `${ph(Wp1)} · schon gebucht`, 'var(--in)')}
         ${tile('Letzte 4 Wochen', l4n ? l4min / (l4n * cap) * 100 : null, `${de0.format(l4min / 60)} von ${de0.format(l4n * cap / 60)} Platzstunden${l4min ? ' · davon ' + de0.format(l4t / l4min * 100) + ' % Training' : ''}`, 'var(--c-pers)')}</section>
-      <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>
-      <section class="panel"><div><h2>Wann ist die Halle voll?</h2><p class="explain">Durchschnittliche Belegung je Wochentag und Uhrzeit: letzte 8 Wochen und schon gebuchte kommende 2 Wochen, soweit gespeichert. Je dunkler, desto voller.</p></div>${heatHtml}</section>`;
+      <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>`;
     bars($('h-weeks'), weeks.map(w => ({ label: fmtW(w), v: w.p || 0, top: w.p === null ? '' : de0.format(w.p), future: w.future, hl: w.current })), v => v + ' %', 100);
   }
 
