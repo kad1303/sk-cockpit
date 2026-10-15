@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -270,6 +270,12 @@ function openCompany(id, year) {
   bindAppbar();
   const c = company();
   $('co-logo').style.background = c.color;
+  // Firmen mit eigenem Schriftzug: Logo statt „SK“-Kreis und Titel (Titel bleibt für Screenreader)
+  if (WORDMARKS.includes(id)) {
+    app.querySelector('header.top').classList.add('has-wordmark');
+    $('title').classList.add('sr-only');
+    $('title').insertAdjacentHTML('beforebegin', `<span class="wordmark wordmark-${id}" role="img" aria-label="${esc(c.short)}"></span>`);
+  }
   $('upload-btn').addEventListener('click', () => fileInput.click());
   $('year').addEventListener('change', e => {
     state.year = +e.target.value; state.period = 'cum';
@@ -288,6 +294,9 @@ function openCompany(id, year) {
   const saved = (prefs().tabs || {})[id];
   showTab(tabs.some(([k]) => k === saved) ? saved : 'finanzen');
 }
+
+// Firmen, für die es in icons/ einen Schriftzug gibt (logo-<id>.png, siehe styles.css)
+const WORDMARKS = ['tennis'];
 
 // Reiter: „Finanzen“ kommt aus der BWA, die übrigen sind Live-Daten aus Google Drive / eBuSy
 const TABS = {
