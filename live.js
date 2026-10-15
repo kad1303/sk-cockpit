@@ -25,16 +25,29 @@ const Live = (() => {
 
   function configured() { return !!URL_; }
 
-  async function load(refresh) {
+  // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], training: ['fitness', 'trainer'] };
+  const got = {};
+  async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
-    if (data && !refresh && Date.now() - loadedAt < 10 * 60000) return data;
-    if (loading) return loading;
+    const fresh = p => got[p] && Date.now() - got[p] < 10 * 60000;
+    const parts = NEEDS[tab].filter(p => refresh || !fresh(p));
+    if (!parts.length) return data;
+    if (loading) await loading.catch(() => {});
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
     loading = (async () => {
-      const res = await fetch(URL_, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), refresh: !!refresh }) });
+      let res;
+      try {
+        res = await fetch(URL_, { method: 'POST', signal: ctl.signal, body: JSON.stringify({ token: await Auth.token(), refresh: !!refresh, parts }) });
+      } catch (e) {
+        throw new Error(e.name === 'AbortError' ? 'Google antwortet gerade sehr langsam. Bitte gleich noch einmal versuchen.' : 'Keine Verbindung zu Google.');
+      } finally { clearTimeout(timer); }
       const d = await res.json();
       if (d.error === 'unauthorized') throw new Error('Kein Zugriff auf die Live-Daten.');
-      data = d; loadedAt = Date.now();
-      return d;
+      data = Object.assign(data || {}, d);
+      parts.forEach(p => { got[p] = Date.now(); });
+      loadedAt = Date.now();
+      return data;
     })();
     try { return await loading; } finally { loading = null; }
   }
@@ -57,9 +70,9 @@ const Live = (() => {
       host.innerHTML = `<section class="panel empty"><h2>Live-Daten noch nicht verbunden</h2><p class="sub">Der Google-Baustein ist noch nicht eingerichtet.</p></section>`;
       return;
     }
-    if (!data) host.innerHTML = '<section class="panel empty"><p class="sub">Lade Live-Daten aus Google Drive …</p></section>';
+    if (!data || NEEDS[tab].some(p => !data[p])) host.innerHTML = '<section class="panel empty"><p class="sub">Lade Live-Daten aus Google Drive …</p></section>';
     try {
-      await load(false);
+      await load(tab, false);
     } catch (e) {
       host.innerHTML = `<section class="panel empty"><h2>Live-Daten nicht erreichbar</h2><p class="sub">${esc(e.message || e)}</p><button class="btn" type="button" id="live-retry">Erneut versuchen</button></section>`;
       $('live-retry').addEventListener('click', () => render(tab, company, host));
@@ -81,7 +94,7 @@ const Live = (() => {
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
-      try { await load(true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); rb.disabled = false; rb.textContent = 'Aktualisieren'; }
+      try { await load(tab, true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); rb.disabled = false; rb.textContent = 'Aktualisieren'; }
     });
   }
 
@@ -305,11 +318,11 @@ const Live = (() => {
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
-      try { await load(true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); }
+      try { await load(tab, true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); }
     });
   }
 
-  function reset() { data = null; loadedAt = 0; }
+  function reset() { data = null; loadedAt = 0; Object.keys(got).forEach(k => delete got[k]); }
 
   return { render, configured, reset };
 })();
