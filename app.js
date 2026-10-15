@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '3';
+const APP_VERSION = '4';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -80,6 +80,7 @@ function renderMessage(title, text, withLogout) {
 async function logout() {
   await Auth.signOut();
   state.me = null; state.docs = {}; state.company = null;
+  Live.reset();
   renderLogin();
 }
 
@@ -173,12 +174,14 @@ const DASH = `
         <div class="meta" id="meta"></div>
       </div>
     </div>
-    <div class="controls">
+    <div class="controls" id="fin-controls">
       <select id="year" aria-label="Jahr"></select>
       <select id="period" aria-label="Zeitraum"></select>
       <button class="btn" id="upload-btn" type="button">BWA hochladen</button>
     </div>
   </header>
+
+  <nav class="tabs" id="tabs" aria-label="Bereiche"></nav>
 
   <section class="panel upload" id="upload-panel" aria-live="polite" hidden>
     <div class="panel-head"><h2 id="up-h"></h2><span class="sub" id="up-file"></span></div>
@@ -188,6 +191,7 @@ const DASH = `
   </section>
 
   <div id="dash-body"></div>
+  <div id="live-body" class="live" hidden></div>
 </div>`;
 
 const BODY = `
@@ -278,6 +282,29 @@ function openCompany(id, year) {
     Fin.renderPeriod(state.period);
   });
   renderDash();
+  const tabs = TABS[id] || TABS.tennis;
+  $('tabs').innerHTML = tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join('');
+  $('tabs').querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  const saved = (prefs().tabs || {})[id];
+  showTab(tabs.some(([k]) => k === saved) ? saved : 'finanzen');
+}
+
+// Reiter: „Finanzen“ kommt aus der BWA, die übrigen sind Live-Daten aus Google Drive / eBuSy
+const TABS = {
+  tennis: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['trainer', 'Trainer'], ['halle', 'Halle']],
+  fitness: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['training', 'Training']],
+};
+
+function showTab(tab) {
+  state.tab = tab;
+  savePrefs({ tabs: Object.assign({}, prefs().tabs, { [state.company]: tab }) });
+  $('tabs').querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'));
+  const fin = tab === 'finanzen';
+  $('dash-body').hidden = !fin;
+  $('fin-controls').hidden = !fin;
+  $('live-body').hidden = fin;
+  if (!fin) { $('upload-panel').hidden = true; Live.render(tab, state.company, $('live-body')); }
+  else if (state.year && $('flow')) Fin.redrawCharts(state.period);
 }
 
 function renderDash() {
@@ -410,7 +437,7 @@ async function commit(parsed, file) {
 
 fileInput.addEventListener('change', () => { handleFile(fileInput.files[0]); fileInput.value = ''; });
 let dragDepth = 0;
-const canDrop = () => !!state.company && !!$('upload-btn');
+const canDrop = () => !!state.company && state.tab === 'finanzen' && !!$('upload-btn');
 window.addEventListener('dragenter', e => { if (!canDrop()) return; if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; dropHint.hidden = false; } });
 window.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) dropHint.hidden = true; });
 window.addEventListener('dragover', e => { e.preventDefault(); });
@@ -479,7 +506,10 @@ Auth.onExpired = () => renderLogin('Bitte melde dich erneut an.');
 let rt;
 window.addEventListener('resize', () => {
   clearTimeout(rt);
-  rt = setTimeout(() => { if (state.company && state.year && $('flow')) Fin.redrawCharts(state.period); }, 120);
+  rt = setTimeout(() => {
+    if (state.tab && state.tab !== 'finanzen' && $('live-body')) Live.render(state.tab, state.company, $('live-body'));
+    else if (state.company && state.year && $('flow')) Fin.redrawCharts(state.period);
+  }, 150);
 });
 
 // Beim Zurückkehren in die App: nach Updates und neuen BWAs schauen
