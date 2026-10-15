@@ -105,7 +105,7 @@ const Fin = (() => {
   }
 
   function renderMeta(company) {
-    const chips = [`Stand: BWA ${esc(D.stand)}`, `vom ${esc(D.erstellt || '–')}`, 'vorläufige Zahlen'];
+    const chips = [`Stand: BWA ${esc(D.stand)}`, 'vorläufige Zahlen'];
     $('meta').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join('');
     $('title').textContent = company.short;
     $('ratio-avg').textContent = 'Ø ' + rangeTxt().replace(' ' + D.year, '');

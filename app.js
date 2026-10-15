@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '8';
+const APP_VERSION = '9';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -311,6 +311,7 @@ function showTab(tab) {
   const fin = tab === 'finanzen';
   $('dash-body').hidden = !fin;
   $('fin-controls').hidden = !fin;
+  $('meta').hidden = !fin; // BWA-Stand nur bei den BWA-Zahlen zeigen
   $('live-body').hidden = fin;
   if (!fin) { $('upload-panel').hidden = true; Live.render(tab, state.company, $('live-body')); }
   else if (state.year && $('flow')) Fin.redrawCharts(state.period);
