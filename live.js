@@ -151,7 +151,12 @@ const Live = (() => {
     const dim = new Date(mm.y, mm.m + 1, 0).getDate();
     const frac = isCur ? Math.min(1, now.getDate() / dim) : 1;
     const opts = months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[months[i].m]} ${months[i].y}${i === curIdx ? ' (bis heute)' : ''}</option>`).join('');
-    const list = rows.map(r => ({ name: r.name, ist: r.ist[sel], soll: r.soll ? r.soll * frac : null })).filter(r => r.ist !== null);
+    // Soll steht als Stunden pro Woche in der Einstellungs-Tabelle → auf den Monat umrechnen (Tage ÷ 7).
+    // Werte über 60 sind ältere Monatswerte und werden direkt genommen.
+    const monthSoll = s => s ? (s > 60 ? s : s * dim / 7) : null;
+    const list = rows.map(r => ({ name: r.name, ist: r.ist[sel], soll: r.soll ? monthSoll(r.soll) * frac : null, week: r.soll && r.soll <= 60 ? r.soll : null })).filter(r => r.ist !== null);
+    const weeks = [...new Set(list.map(r => r.week).filter(Boolean))];
+    const sollTxt = weeks.length === 1 ? `Soll = ${h1(weeks[0])} pro Woche, im ${ML[mm.m]} also ${h1(weeks[0] * dim / 7)}` : 'Soll je Trainer laut Einstellungs-Tabelle';
     const withSoll = list.filter(r => r.soll);
     const tIst = withSoll.reduce((s, r) => s + r.ist, 0), tSoll = withSoll.reduce((s, r) => s + r.soll, 0);
     const maxV = Math.max(1, ...list.map(r => Math.max(r.ist, r.soll || 0))) * 1.08;
@@ -168,7 +173,7 @@ const Live = (() => {
       html: `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
           ${tSoll ? `<span class="sub">Team: ${h1(tIst)} von ${h1(tSoll)} · <b>${pct0(tIst / tSoll * 100)}</b></span>` : ''}</div>
           <ul class="trainers">${bars || '<li class="sub">Keine Stundenliste für diesen Monat gefunden.</li>'}</ul>
-          <p class="hint">Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll${isCur ? ' (anteilig bis heute)' : ''}. Grün ab 95 %, gelb ab 80 %.</p></section>`,
+          <p class="hint"><b>${sollTxt}${isCur ? ', anteilig bis heute' : ''}.</b> Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll. Grün ab 95 %, gelb ab 80 %.</p></section>`,
       bind: redraw => { const s = $(idPrefix + '-month'); s.value = String(sel); s.addEventListener('change', e => { st.month = +e.target.value; redraw(); }); },
     };
   }
@@ -178,7 +183,7 @@ const Live = (() => {
     const rows = T.rows.filter(r => r.co === company);
     const st = ui.trainer[company] = ui.trainer[company] || {};
     const b = trainerBlock(rows, T.months, st, 'tr');
-    host.innerHTML = head('Trainerauslastung', 'Gearbeitete Stunden aus „SK – Stundenlisten“ gegenüber den Soll-Stunden. Soll-Stunden lassen sich in der Einstellungs-Tabelle in Google Drive ändern.', b.controls) + b.html;
+    host.innerHTML = head('Trainerauslastung', 'Gearbeitete Stunden aus „SK – Stundenlisten“ gegenüber dem Soll von 30 Stunden pro Woche. Das Soll lässt sich je Trainer in der Einstellungs-Tabelle in Google Drive ändern.', b.controls) + b.html;
     b.bind(() => { drawTrainer(company, host); bindRefresh(host, 'trainer', company); });
   }
 
