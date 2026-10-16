@@ -230,7 +230,7 @@ const Live = (() => {
     rows.forEach(r => { r.db = r.rev - r.cost; r.marge = r.rev ? r.db / r.rev * 100 : null; });
     rows.sort((a, b) => b.rev - a.rev);
     const sumRev = rows.reduce((s, r) => s + r.rev, 0), sumDb = rows.reduce((s, r) => s + r.db, 0);
-    const gf = S(R.gf), gem = S(R.gem), erg = sumDb - gf - gem;
+    const gf = S(R.gf), gem = S(R.gem), ust = S(R.ust || []), erg = sumDb - gf - gem - ust;
     const hTot = rows.reduce((s, r) => s + r.hours, 0);
     const maxAbs = Math.max(1, ...rows.map(r => Math.abs(r.marge || 0)));
     const label = period === 'cum' ? `${MS[0]}–${MS[cur - 1]} ${R.year}` : period === 'cumNow' ? `${MS[0]}–${MS[cur]} ${R.year} (bis heute)` : `${ML[period]} ${R.year}`;
@@ -239,7 +239,7 @@ const Live = (() => {
       done.slice().reverse().map(m => `<option value="${m}">${ML[m]} ${R.year}</option>`).join('');
     const line = (n, v, cls) => `<tr class="${cls || ''}"><td>${n}</td><td></td><td></td><td class="r num ${v < 0 ? 'down' : ''}">${eurS(v)}</td><td></td><td></td></tr>`;
     host.innerHTML = head('Rentabilität je Bereich',
-      'Umsatz und Kosten je Bereich aus der Finanzübersicht (Zahlungen, ohne Umsatzsteuer). Trainergehälter werden nach den Stunden laut Stundenlisten verteilt (VS = Akademie, (VS) halb/halb, Club, sonst Privat; BZ zählt nicht). Geschäftsführung und Gemeinkosten werden erst am Ende abgezogen.',
+      'Umsatz und Kosten je Bereich aus der Finanzübersicht (Zahlungen; Umsätze inkl. Umsatzsteuer, die USt wird am Ende abgezogen). Trainergehälter werden nach den Stunden laut Stundenlisten verteilt (VS = Akademie, (VS) halb/halb, Club, sonst Privat; BZ zählt nicht). Geschäftsführung und Gemeinkosten werden erst am Ende abgezogen.',
       `<select id="r-period" aria-label="Zeitraum">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><h2>${esc(label)}</h2><span class="sub">Deckungsbeitrag aller Bereiche: <b>${eurS(sumDb)}</b></span></div>
         <div class="tbl-wrap"><table class="rendite">
@@ -252,6 +252,7 @@ const Live = (() => {
             <tr class="sum"><td>Summe Bereiche</td><td class="r num">${eur(sumRev)}</td><td></td><td class="r num"><b>${eurS(sumDb)}</b></td><td>${sumRev ? de0.format(sumDb / sumRev * 100) + ' %' : ''}</td><td></td></tr>
             ${line('− Geschäftsführung (Kevin, Philipp)', -gf)}
             ${line('− Gemeinkosten (Büro, Steuerberater, Versicherungen, Auto …)', -gem)}
+            ${ust ? line('− Umsatzsteuer (an das Finanzamt gezahlt)', -ust) : ''}
             ${line('= Ergebnis laut Finanzübersicht', erg, 'sum key')}
           </tfoot></table></div>
         <p class="hint">Marge = Deckungsbeitrag ÷ Umsatz. Das Ergebnis hier ist eine Zahlungssicht und weicht von der BWA ab (z. B. Abgrenzungen, Umsatzsteuer, Zahlungszeitpunkte). Zuordnung der Kosten änderbar im Blatt „Kosten-Zuordnung“ der Einstellungs-Tabelle.</p></section>`;
