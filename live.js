@@ -237,15 +237,19 @@ const Live = (() => {
     const ph = w => w.n ? `<b>${de1.format(w.min / 60).replace(/,0$/, '')} von ${de0.format(w.n * cap / 60)} Platzstunden</b>` : 'noch keine Daten';
     const trainTxt = w =>w.min ? ` · davon ${de0.format(w.t / w.min * 100)} % eigenes Training` : '';
     const fmtW = w => `${w.start.getDate()}.${w.start.getMonth() + 1}.`;
-    const tile = (l, p, sub, k) => `<article class="tile"><div class="label"><i class="sw" style="--k:${k}"></i>${l}</div><div class="value num">${p === null ? '–' : pct0(p)}</div><div class="what">${sub}</div></article>`;
+    // Vorjahr: dieselbe Kalenderwoche (52 Wochen zurück, gleiche Wochentage)
+    const pyWeek = w => { const s = new Date(w.start); s.setDate(s.getDate() - 364); return week(s); };
+    const pyTxt = (p, py) => py === null || p === null ? '' : `<div class="delta"><span class="${p >= py ? 'up' : 'down'}">${p >= py ? '▲' : '▼'} ${sgn(p - py, x => de0.format(x))} Pkt.</span><span class="cmp">ggü. Vorjahr (${pct0(py)})</span></div>`;
+    const l4py = (() => { const ws = last4.map(pyWeek), m = ws.reduce((s, w) => s + w.min, 0), n = ws.reduce((s, w) => s + w.n, 0); return n ? m / (n * cap) * 100 : null; })();
+    const tile = (l, p, sub, k, py) => `<article class="tile"><div class="label"><i class="sw" style="--k:${k}"></i>${l}</div><div class="value num">${p === null ? '–' : pct0(p)}</div>${pyTxt(p, py === undefined ? null : py)}<div class="what">${sub}</div></article>`;
     const oh = Math.floor(H.open / 60);
     const since = H.since ? new Date(H.since + 'T12:00:00') : null;
     const missing = !since || since > weeks[0].start;
     host.innerHTML = head('Hallenauslastung', `Alle Belegungen aus eBuSy (Einzel- und Abobuchungen, auch von Externen, plus eigenes Training) auf ${H.courts} Plätzen, gezählt ${String(oh).padStart(2, '0')}–${Math.ceil(H.close / 60)} Uhr. 100 % = jede Stunde auf jedem Platz belegt.`) +
-      `<section class="tiles">${tile('Diese Woche', W0.p, `${ph(W0)} · ab ${fmtW(W0)}, inkl. schon gebuchter Tage${trainTxt(W0)}`, 'var(--accent)')}
-        ${tile('Letzte Woche', Wm1.p, `${ph(Wm1)} · ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)')}
+      `<section class="tiles">${tile('Diese Woche', W0.p, `${ph(W0)} · ab ${fmtW(W0)}, inkl. schon gebuchter Tage${trainTxt(W0)}`, 'var(--accent)', pyWeek(W0).p)}
+        ${tile('Letzte Woche', Wm1.p, `${ph(Wm1)} · ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)', pyWeek(Wm1).p)}
         ${tile('Nächste Woche', Wp1.p, `${ph(Wp1)} · schon gebucht`, 'var(--in)')}
-        ${tile('Letzte 4 Wochen', l4n ? l4min / (l4n * cap) * 100 : null, `${de0.format(l4min / 60)} von ${de0.format(l4n * cap / 60)} Platzstunden${l4min ? ' · davon ' + de0.format(l4t / l4min * 100) + ' % Training' : ''}`, 'var(--c-pers)')}</section>
+        ${tile('Letzte 4 Wochen', l4n ? l4min / (l4n * cap) * 100 : null, `${de0.format(l4min / 60)} von ${de0.format(l4n * cap / 60)} Platzstunden${l4min ? ' · davon ' + de0.format(l4t / l4min * 100) + ' % Training' : ''}`, 'var(--c-pers)', l4py)}</section>
       <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>`;
     bars($('h-weeks'), weeks.map(w => ({ label: fmtW(w), v: w.p || 0, top: w.p === null ? '' : de0.format(w.p), future: w.future, hl: w.current })), v => v + ' %', 100);
   }
