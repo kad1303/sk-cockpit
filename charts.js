@@ -45,6 +45,8 @@ function deriveRows(doc) {
   B.aus = B.umsatz.map((_, i) => B.waren[i] + B.gk[i] + B.naufw[i]);
   B.erg = B.ein.map((v, i) => v - B.aus[i]);
   B.sonstAlle = B.umsatz.map((_, i) => B.sonst[i] + B.uebrige[i] + B.naufw[i]);
+  // Dienstleister (Fremdleistungen) stecken in der BWA im Wareneinkauf; Aufteilung kommt ggf. aus der Finanzübersicht
+  B.dl = z(); B.wrest = B.waren.slice();
   return B;
 }
 
@@ -67,14 +69,30 @@ const Fin = (() => {
     PB = PY ? deriveRows(PY) : null;
   }
 
-  // Werte des Vorjahres für dieselben Monate (oder null, wenn nicht vorhanden)
-  function pyVal(k, p) {
+  // Vergleich mit dem Vorjahr über die Monate, die es in beiden Jahren gibt
+  // (z. B. Fitness: 2025 erst ab März → „Mär–Aug ggü. Vorjahr“). Liefert null, wenn es keine gemeinsamen Monate gibt.
+  function pyCmp(k, p) {
     if (!PY) return null;
     const want = p === 'cum' ? mi : [mi[p]];
-    const idx = want.map(m => PY.months.indexOf(m));
-    if (idx.some(i => i < 0)) return null;
-    return sum(idx.map(i => PB[k][i]));
+    const both = want.filter(m => PY.months.includes(m));
+    if (!both.length) return null;
+    const cur = sum(both.map(m => B[k][mi.indexOf(m)]));
+    const py = sum(both.map(m => PB[k][PY.months.indexOf(m)]));
+    const label = p !== 'cum' ? `${ms(p)} ${D.year - 1}` : both.length === want.length ? 'Vorjahr'
+      : `${MS[both[0]]}–${MS[both[both.length - 1]]} ${D.year - 1}`;
+    return { cur, py, label, partial: both.length < want.length };
   }
+  // Zahlungen an Dienstleister (z. B. SK Fitness Base) je Monat laut Finanzübersicht → aus dem Wareneinkauf herauslösen
+  let dlName = '';
+  function setDienst(values, name) {
+    if (!B) return false;
+    dlName = name || 'Dienstleister';
+    B.dl = mi.map((m, i) => Math.max(0, Math.min(values ? values[m] || 0 : 0, B.waren[i])));
+    B.wrest = B.waren.map((w, i) => w - B.dl[i]);
+    return sum(B.dl) > 0;
+  }
+  const hasDL = () => sum(B.dl) > 0;
+  const pyVal = (k, p) => { const c = pyCmp(k, p); return c && !c.partial ? c.py : null; };
 
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs, parent) => {
@@ -122,27 +140,28 @@ const Fin = (() => {
       return `<span class="${cls}">${d > 0 ? '▲' : d < 0 ? '▼' : ''} ${sgn(d, x => de1.format(x))} %</span><span class="cmp">ggü. ${what}</span>`;
     };
     const cmpAbs = (cur, old, what) => `<span class="${cur - old >= 0 ? 'up' : 'down'}">${cur - old >= 0 ? '▲' : '▼'} ${eurS(cur - old)}</span><span class="cmp">ggü. ${what}</span>`;
-    const pyLabel = p === 'cum' ? 'Vorjahr' : `${ms(p)} ${D.year - 1}`;
-    const pyE = pyVal('ein', p), pyA = pyVal('aus', p), pyR = pyVal('erg', p);
-    const pyLine = (v, f) => v === null ? '' : `<div class="delta">${f}</div>`;
+    const cE = pyCmp('ein', p), cA = pyCmp('aus', p), cR = pyCmp('erg', p);
+    // Bei nur teilweise vorhandenem Vorjahr: gleiche Monate vergleichen und das dazuschreiben
+    const pyLabel = cE ? (cE.partial ? `Vorjahr (${cE.label.replace(/ \d{4}$/, '')})` : cE.label) : '';
+    const pyLine = (c, f) => c ? `<div class="delta">${f}</div>` : '';
     const plus = B.erg.filter(v => v >= 0).length;
     const tiles = [
       { k: 'var(--in)', label: 'Einnahmen', value: eur(E), cls: '',
         what: 'Alles, was reingekommen ist: Umsätze plus sonstige Erträge.',
         delta: prev !== null ? cmpPct(E, B.ein[prev], 1, ms(prev)) : `<span class="cmp">Ø ${eur(sum(B.ein) / N)} pro Monat</span>`,
-        py: pyLine(pyE, pyE !== null && cmpPct(E, pyE, 1, pyLabel)) },
+        py: pyLine(cE, cE && cmpPct(cE.cur, cE.py, 1, pyLabel)) },
       { k: 'var(--out)', label: 'Ausgaben', value: eur(A), cls: '',
         what: 'Alle Kosten: Personal, Waren, Miete, Werbung und Sonstiges.',
         delta: prev !== null ? cmpPct(A, B.aus[prev], -1, ms(prev)) : `<span class="cmp">Ø ${eur(sum(B.aus) / N)} pro Monat</span>`,
-        py: pyLine(pyA, pyA !== null && cmpPct(A, pyA, -1, pyLabel)) },
+        py: pyLine(cA, cA && cmpPct(cA.cur, cA.py, -1, pyLabel)) },
       { k: R >= 0 ? 'var(--c-gewinn)' : 'var(--neg)', label: R >= 0 ? 'Gewinn' : 'Verlust', value: eurS(R), cls: R >= 0 ? 'pos' : 'neg',
         what: 'Einnahmen minus Ausgaben, vor Steuern.',
         delta: prev !== null ? cmpAbs(R, B.erg[prev], ms(prev)) : `<span class="cmp">${plus} von ${N} Monaten im Plus</span>`,
-        py: pyLine(pyR, pyR !== null && cmpAbs(R, pyR, pyLabel)) },
+        py: pyLine(cR, cR && cmpAbs(cR.cur, cR.py, pyLabel)) },
       { k: 'var(--accent)', label: 'Übrig von 100 €', value: per100(r100), cls: r100 >= 0 ? '' : 'neg',
         what: 'So viel bleibt von je 100 € Einnahmen als Gewinn übrig.',
         delta: p !== 'cum' ? `<span class="cmp">${rangeTxt()} insgesamt: ${per100(sum(B.erg) / sum(B.ein) * 100)}</span>` : `<span class="cmp">Umsatzrendite ${pct(r100)}</span>`,
-        py: pyE ? `<div class="delta"><span class="cmp">${pyLabel}: ${per100(pyR / pyE * 100)}</span></div>` : '' }
+        py: cE && cE.py ? `<div class="delta"><span class="cmp">${cE.partial ? cE.label : pyLabel}: ${per100(cR.py / cE.py * 100)}</span></div>` : '' }
     ];
     $('tiles').innerHTML = tiles.map(t => `<article class="tile">
       <div class="label"><i class="sw" style="--k: ${t.k}"></i>${t.label}</div>
@@ -214,7 +233,10 @@ const Fin = (() => {
     const E = S('ein', p), A = S('aus', p), R = E - A;
     const cats = [
       { n: 'Personal', d: 'Löhne, Gehälter und Sozialabgaben', k: 'var(--c-pers)', v: S('personal', p) },
-      { n: 'Waren und Material', d: 'Einkauf von Waren und Material', k: 'var(--c-ware)', v: S('waren', p) },
+      ...(hasDL() ? [
+        { n: dlName + ' (Dienstleister)', d: 'laut Finanzübersicht, in der BWA im Wareneinkauf enthalten', k: 'var(--c-dl)', v: S('dl', p) },
+        { n: 'Waren und Material', d: 'Shop-Ware, Material u. a.', k: 'var(--c-ware)', v: S('wrest', p) },
+      ] : [{ n: 'Waren und Material', d: 'Einkauf von Waren und Material, inkl. Fremdleistungen', k: 'var(--c-ware)', v: S('waren', p) }]),
       { n: 'Miete und Räume', d: 'Miete, Nebenkosten, Energie', k: 'var(--c-raum)', v: S('raum', p) },
       { n: 'Werbung und Reisen', d: 'Werbung, Reise- und Bewirtungskosten', k: 'var(--c-werb)', v: S('werbe', p) },
       { n: 'Sonstiges', d: 'Büro, Beratung, Versicherungen, Fahrzeug u. a.', k: 'var(--c-sonst)', v: S('sonstAlle', p) }
@@ -287,8 +309,9 @@ const Fin = (() => {
       ? `<b>${rangeTxt()} insgesamt ${total / E * 100 < 3 ? 'knapp ' : ''}im Plus:</b> ${eurS(total)}.`
       : `<b>${rangeTxt()} insgesamt im Minus:</b> ${eurS(total)}.`;
     if (total > 0 && B.erg[best] > total) t += ` Der ${ml(best)} allein brachte ${eurS(B.erg[best])}, die übrigen Monate haben davon wieder etwas aufgezehrt.`;
-    const pyTotal = pyVal('erg', 'cum');
-    if (pyTotal !== null) t += ` Im gleichen Zeitraum ${D.year - 1}: ${eurS(pyTotal)}.`;
+    const pc = pyCmp('erg', 'cum');
+    if (pc && !pc.partial) t += ` Im gleichen Zeitraum ${D.year - 1}: ${eurS(pc.py)}.`;
+    else if (pc) t += ` ${pc.label.replace(/ \d{4}$/, '')}: ${eurS(pc.cur)} gegenüber ${eurS(pc.py)} im Vorjahr.`;
     items.push([total < 0 ? 'crit' : total / E * 100 < 3 ? 'warn' : 'good', total < 0 ? '−' : total / E * 100 < 3 ? '!' : '✓', t]);
     let streak = 0; for (let i = L; i >= 0 && B.erg[i] < 0; i--) streak++;
     const neg = B.erg.filter(v => v < 0).length;
@@ -340,7 +363,9 @@ const Fin = (() => {
 
   function renderBWA(p) {
     const rows = [
-      ['Umsatzerlöse', 'umsatz', ''], ['Material-/Wareneinkauf', 'waren', ''], ['Rohertrag', 'rohertrag', 'sum'],
+      ['Umsatzerlöse', 'umsatz', ''], ['Material-/Wareneinkauf', 'waren', ''],
+      ...(hasDL() ? [[`· davon ${dlName} (Dienstleister, lt. Finanzübersicht)`, 'dl', 'subrow'], ['· davon Waren und Material', 'wrest', 'subrow']] : []),
+      ['Rohertrag', 'rohertrag', 'sum'],
       ['Sonstige betriebliche Erlöse', 'sbe', ''], ['Betrieblicher Rohertrag', 'bro', 'sum'],
       ['Personalkosten', 'personal', ''], ['Raumkosten', 'raum', ''], ['Werbe-/Reisekosten', 'werbe', ''],
       ['Sonstige Kosten', 'sonst', ''], ['Kfz, Versicherung, Steuern, AfA, Rep.', 'uebrige', ''],
@@ -368,5 +393,5 @@ const Fin = (() => {
     return { erg: sum(b.erg), ein: sum(b.ein), range: n === 1 ? `${MS[doc.months[0]]} ${doc.year}` : `${MS[doc.months[0]]}–${MS[doc.months[n - 1]]} ${doc.year}`, last: b.erg[n - 1], lastName: ML[doc.months[n - 1]] };
   }
 
-  return { setData, periodOptions, renderMeta, renderPoints, renderPeriod, redrawCharts, summary, rangeTxt: () => rangeTxt() };
+  return { setData, setDienst, periodOptions, renderMeta, renderPoints, renderPeriod, redrawCharts, summary, rangeTxt: () => rangeTxt() };
 })();

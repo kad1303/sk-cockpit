@@ -159,6 +159,35 @@ const Live = (() => {
     const sollTxt = weeks.length === 1 ? `Soll = ${h1(weeks[0])} pro Woche, im ${ML[mm.m]} also ${h1(weeks[0] * dim / 7)}` : 'Soll je Trainer laut Einstellungs-Tabelle';
     const withSoll = list.filter(r => r.soll);
     const tIst = withSoll.reduce((s, r) => s + r.ist, 0), tSoll = withSoll.reduce((s, r) => s + r.soll, 0);
+    // Jahresschnitt: alle Monate des laufenden Jahres bis heute (aktueller Monat anteilig)
+    const yr = now.getFullYear();
+    const yIdx = months.map((x, i) => i).filter(i => months[i].y === yr);
+    const sollAt = (s, i) => {
+      if (!s) return 0;
+      const d = new Date(months[i].y, months[i].m + 1, 0).getDate();
+      const f = i === curIdx ? Math.min(1, now.getDate() / d) : 1;
+      return (s > 60 ? s : s * d / 7) * f;
+    };
+    const yearList = rows.filter(r => r.soll).map(r => {
+      const ist = yIdx.reduce((s, i) => s + (r.ist[i] || 0), 0);
+      return { name: r.name, ist, soll: yIdx.reduce((s, i) => s + (r.ist[i] === null ? 0 : sollAt(r.soll, i)), 0) };
+    }).filter(r => r.soll > 0);
+    const yIst = yearList.reduce((s, r) => s + r.ist, 0), ySoll = yearList.reduce((s, r) => s + r.soll, 0);
+    const barList = (items) => {
+      const mx = Math.max(1, ...items.map(r => Math.max(r.ist, r.soll || 0))) * 1.08;
+      return items.map(r => {
+        const p = r.soll ? r.ist / r.soll * 100 : null;
+        const cls = p === null ? '' : p >= 95 ? 'good' : p >= 80 ? 'warn' : 'crit';
+        return `<li><span class="tr-name">${esc(r.name)}</span>
+          <span class="tr-bar"><span class="tr-ist ${cls}" style="width:${r.ist / mx * 100}%"></span>${r.soll ? `<span class="tr-soll" style="left:${r.soll / mx * 100}%" title="Soll ${h1(r.soll)}"></span>` : ''}</span>
+          <span class="num tr-val">${h1(Math.round(r.ist))}${r.soll ? ` <small>/ ${h1(Math.round(r.soll))}</small>` : ''}</span>
+          <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
+      }).join('');
+    };
+    const yearHtml = yearList.length ? `<section class="panel"><div class="panel-head"><h2>Jahresschnitt ${yr}</h2>
+        <span class="sub">${MS[months[yIdx[0]].m]}–heute · Team: ${h1(Math.round(yIst))} von ${h1(Math.round(ySoll))} · <b>${pct0(yIst / ySoll * 100)}</b></span></div>
+        <ul class="trainers">${barList(yearList)}</ul>
+        <p class="hint">Alle Stunden seit Januar gegenüber dem Soll seit Januar (laufender Monat anteilig bis heute).</p></section>` : '';
     const maxV = Math.max(1, ...list.map(r => Math.max(r.ist, r.soll || 0))) * 1.08;
     const bars = list.map(r => {
       const p = r.soll ? r.ist / r.soll * 100 : null;
@@ -170,7 +199,7 @@ const Live = (() => {
     }).join('');
     return {
       controls: `<select id="${idPrefix}-month" aria-label="Monat">${opts}</select>`,
-      html: `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
+      html: yearHtml + `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
           ${tSoll ? `<span class="sub">Team: ${h1(tIst)} von ${h1(tSoll)} · <b>${pct0(tIst / tSoll * 100)}</b></span>` : ''}</div>
           <ul class="trainers">${bars || '<li class="sub">Keine Stundenliste für diesen Monat gefunden.</li>'}</ul>
           <p class="hint"><b>${sollTxt}${isCur ? ', anteilig bis heute' : ''}.</b> Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll. Grün ab 95 %, gelb ab 80 %.</p></section>`,
@@ -253,5 +282,8 @@ const Live = (() => {
 
   function reset() { data = null; loadedAt = 0; Object.keys(got).forEach(k => delete got[k]); }
 
-  return { render, configured, reset };
+  // Einzelnen Datenteil holen (z. B. für den Finanzen-Reiter)
+  async function part(name) { await load(name, false); return data && data[name]; }
+
+  return { render, configured, reset, part };
 })();

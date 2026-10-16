@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -352,6 +352,15 @@ function renderDash() {
   pl.addEventListener('click', () => openPdf(doc.file_path));
   Fin.renderPoints();
   Fin.renderPeriod(state.period);
+  // Tennis: Zahlungen an die SK Fitness Base aus dem Wareneinkauf herauslösen (Quelle: Finanzübersicht)
+  if (c.id === 'tennis' && Live.configured()) {
+    const co = c.id, yr = state.year;
+    Live.part('umsatz').then(u => {
+      const v = u && u.dienst && u.dienst[co] && u.dienst[co][yr];
+      if (state.company !== co || state.year !== yr || !$('hundred')) return;
+      if (Fin.setDienst(v, 'SK Fitness Base')) Fin.renderPeriod(state.period);
+    }).catch(() => {});
+  }
 }
 
 async function openPdf(path) {

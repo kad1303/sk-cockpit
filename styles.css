@@ -303,3 +303,10 @@ table.hgrid th { text-align: center; padding: 0 4px 6px; }
 .has-wordmark .brand > div:not(.logo) { display: grid; gap: 10px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 @media (max-width: 520px) { .wordmark { height: 22px; } }
+
+/* Dienstleister im Wareneinkauf */
+:root { --c-dl: #0f8b8d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --c-dl: #2bb3b5; } }
+:root[data-theme="dark"] { --c-dl: #2bb3b5; }
+.bwa tr.subrow td { color: var(--ink-2); font-size: 0.8rem; }
+.bwa tr.subrow td:first-child { padding-left: 20px; }
