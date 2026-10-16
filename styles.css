@@ -310,3 +310,13 @@ table.hgrid th { text-align: center; padding: 0 4px 6px; }
 :root[data-theme="dark"] { --c-dl: #2bb3b5; }
 .bwa tr.subrow td { color: var(--ink-2); font-size: 0.8rem; }
 .bwa tr.subrow td:first-child { padding-left: 20px; }
+
+/* Rentabilität */
+table.rendite td, table.rendite th { white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.rendite tfoot td { border-bottom: 0; }
+table.rendite tr.sum td { font-weight: 600; border-top: 1px solid var(--axis); }
+table.rendite tr.key td { font-weight: 700; }
+td.marge { display: flex; align-items: center; gap: 8px; min-width: 150px; }
+.mbar { flex: 1; height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; min-width: 60px; }
+.mbar span { display: block; height: 100%; background: var(--in); border-radius: 5px; }
+.mbar span.neg { background: var(--neg); }

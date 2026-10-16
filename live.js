@@ -9,7 +9,7 @@
 const Live = (() => {
   const URL_ = (window.SK_CONFIG || {}).live || '';
   let data = null, loadedAt = 0, loading = null;
-  const ui = { umsatz: {}, trainer: {} };
+  const ui = { umsatz: {}, trainer: {}, rendite: {} };
   const $ = id => document.getElementById(id);
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs, parent) => {
@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -90,6 +90,7 @@ const Live = (() => {
     if (tab === 'umsatz') drawUmsatz(company, host);
     if (tab === 'trainer') drawTrainer(company, host, 'Trainerauslastung');
     if (tab === 'halle') drawHalle(host);
+    if (tab === 'rendite') drawRendite(host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
@@ -214,6 +215,49 @@ const Live = (() => {
     const b = trainerBlock(rows, T.months, st, 'tr');
     host.innerHTML = head('Trainerauslastung', 'Gearbeitete Stunden aus „SK – Stundenlisten“ gegenüber dem Soll von 30 Stunden pro Woche. Das Soll lässt sich je Trainer in der Einstellungs-Tabelle in Google Drive ändern.', b.controls) + b.html;
     b.bind(() => { drawTrainer(company, host); bindRefresh(host, 'trainer', company); });
+  }
+
+  // ---------- Rentabilität je Bereich ----------
+  function drawRendite(host) {
+    const R = data.rendite;
+    const st = ui.rendite;
+    const cur = R.currentMonth;
+    const done = [...Array(cur).keys()]; // abgeschlossene Monate
+    const period = st.period === undefined ? (cur > 0 ? 'cum' : 'cumNow') : st.period;
+    const range = period === 'cum' ? done : period === 'cumNow' ? [...done, cur] : [period];
+    const S = a => range.reduce((s, m) => s + (a[m] || 0), 0);
+    const rows = R.areas.map(a => ({ name: a.name, rev: S(a.rev), cost: S(a.cost), hours: S(a.hours) })).filter(r => r.rev || r.cost);
+    rows.forEach(r => { r.db = r.rev - r.cost; r.marge = r.rev ? r.db / r.rev * 100 : null; });
+    rows.sort((a, b) => b.rev - a.rev);
+    const sumRev = rows.reduce((s, r) => s + r.rev, 0), sumDb = rows.reduce((s, r) => s + r.db, 0);
+    const gf = S(R.gf), gem = S(R.gem), erg = sumDb - gf - gem;
+    const hTot = rows.reduce((s, r) => s + r.hours, 0);
+    const maxAbs = Math.max(1, ...rows.map(r => Math.abs(r.marge || 0)));
+    const label = period === 'cum' ? `${MS[0]}–${MS[cur - 1]} ${R.year}` : period === 'cumNow' ? `${MS[0]}–${MS[cur]} ${R.year} (bis heute)` : `${ML[period]} ${R.year}`;
+    const opts = (cur > 0 ? `<option value="cum">${MS[0]}–${MS[cur - 1]} ${R.year} (abgeschlossene Monate)</option>` : '') +
+      `<option value="cumNow">${MS[0]}–${MS[cur]} ${R.year} (inkl. laufender Monat)</option>` +
+      done.slice().reverse().map(m => `<option value="${m}">${ML[m]} ${R.year}</option>`).join('');
+    const line = (n, v, cls) => `<tr class="${cls || ''}"><td>${n}</td><td></td><td></td><td class="r num ${v < 0 ? 'down' : ''}">${eurS(v)}</td><td></td><td></td></tr>`;
+    host.innerHTML = head('Rentabilität je Bereich',
+      'Umsatz und Kosten je Bereich aus der Finanzübersicht (Zahlungen, ohne Umsatzsteuer). Trainergehälter werden nach den Stunden laut Stundenlisten verteilt (VS = Akademie, (VS) halb/halb, Club, sonst Privat; BZ zählt nicht). Geschäftsführung und Gemeinkosten werden erst am Ende abgezogen.',
+      `<select id="r-period" aria-label="Zeitraum">${opts}</select>`) +
+      `<section class="panel"><div class="panel-head"><h2>${esc(label)}</h2><span class="sub">Deckungsbeitrag aller Bereiche: <b>${eurS(sumDb)}</b></span></div>
+        <div class="tbl-wrap"><table class="rendite">
+          <thead><tr><th>Bereich</th><th class="r">Umsatz</th><th class="r">Kosten</th><th class="r">Deckungsbeitrag</th><th>Marge</th><th class="r">Trainerstd.</th></tr></thead>
+          <tbody>${rows.map(r => `<tr><td>${esc(r.name)}</td><td class="r num">${eur(r.rev)}</td><td class="r num">${eur(r.cost)}</td>
+            <td class="r num ${r.db < 0 ? 'down' : ''}"><b>${eurS(r.db)}</b></td>
+            <td class="marge">${r.marge === null ? '–' : `<span class="mbar"><span class="${r.marge < 0 ? 'neg' : ''}" style="width:${Math.min(100, Math.abs(r.marge) / maxAbs * 100)}%"></span></span><span class="num ${r.marge < 0 ? 'down' : ''}">${de0.format(r.marge)} %</span>`}</td>
+            <td class="r num sub">${r.hours ? de0.format(r.hours) + ' h' + (hTot ? ` · ${de0.format(r.hours / hTot * 100)} %` : '') : ''}</td></tr>`).join('')}</tbody>
+          <tfoot>
+            <tr class="sum"><td>Summe Bereiche</td><td class="r num">${eur(sumRev)}</td><td></td><td class="r num"><b>${eurS(sumDb)}</b></td><td>${sumRev ? de0.format(sumDb / sumRev * 100) + ' %' : ''}</td><td></td></tr>
+            ${line('− Geschäftsführung (Kevin, Philipp)', -gf)}
+            ${line('− Gemeinkosten (Büro, Steuerberater, Versicherungen, Auto …)', -gem)}
+            ${line('= Ergebnis laut Finanzübersicht', erg, 'sum key')}
+          </tfoot></table></div>
+        <p class="hint">Marge = Deckungsbeitrag ÷ Umsatz. Das Ergebnis hier ist eine Zahlungssicht und weicht von der BWA ab (z. B. Abgrenzungen, Umsatzsteuer, Zahlungszeitpunkte). Zuordnung der Kosten änderbar im Blatt „Kosten-Zuordnung“ der Einstellungs-Tabelle.</p></section>`;
+    const sel = $('r-period');
+    sel.value = String(period);
+    sel.addEventListener('change', e => { const v = e.target.value; st.period = v === 'cum' || v === 'cumNow' ? v : +v; drawRendite(host); bindRefresh(host, 'rendite'); });
   }
 
   // ---------- Halle ----------
