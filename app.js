@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -117,9 +117,12 @@ async function boot() {
   }
   const p = prefs();
   const known = state.companies.some(c => c.id === p.company);
-  if (known && p.remember !== false) openCompany(p.company);
+  if (state.companies.length === 1) openCompany(state.companies[0].id); // z. B. Mitarbeiter mit nur einer Firma
+  else if (known && p.remember !== false) openCompany(p.company);
   else renderPicker();
 }
+
+const isStaff = () => state.me && state.me.role === 'mitarbeiter';
 
 /* ---------- Firmenauswahl ---------- */
 function renderPicker() {
@@ -148,6 +151,7 @@ function renderPicker() {
 }
 
 function appbar(withSwitch) {
+  if (state.companies.length < 2) withSwitch = false;
   const sw = withSwitch ? `<div class="seg-switch" role="group" aria-label="Firma">${state.companies.map(c =>
     `<button data-switch="${esc(c.id)}" aria-pressed="${c.id === state.company}">${esc(c.short)}</button>`).join('')}</div>` : '';
   return `<div class="appbar"><div class="appbar-in">
@@ -287,13 +291,17 @@ function openCompany(id, year) {
     state.period = e.target.value === 'cum' ? 'cum' : +e.target.value;
     Fin.renderPeriod(state.period);
   });
-  renderDash();
-  const tabs = TABS[id] || TABS.tennis;
+  const tabs = isStaff() ? TABS_STAFF : (TABS[id] || TABS.tennis);
+  if (isStaff()) $('title').textContent = c.short; // keine BWA-Daten für Mitarbeiter
+  else renderDash();
   $('tabs').innerHTML = tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join('');
   $('tabs').querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
   const saved = (prefs().tabs || {})[id];
-  showTab(tabs.some(([k]) => k === saved) ? saved : 'finanzen');
+  showTab(tabs.some(([k]) => k === saved) ? saved : tabs[0][0]);
 }
+
+// Mitarbeiter sehen nur Live-Bereiche ohne Firmenzahlen (Trainer zeigt nur die eigenen Stunden)
+const TABS_STAFF = [['trainer', 'Meine Stunden'], ['halle', 'Halle']];
 
 // Firmen, für die es in icons/ einen Schriftzug gibt (logo-<id>.png, siehe styles.css)
 const WORDMARKS = ['tennis', 'fitness'];
@@ -471,7 +479,7 @@ function openAccount() {
   const bg = document.createElement('div');
   bg.className = 'sheet-bg';
   bg.innerHTML = `<form class="card" role="dialog" aria-modal="true" aria-labelledby="acc-h" novalidate>
-    <div><h2 id="acc-h">${esc(state.me.name)}</h2><div class="sub">${esc(Auth.session.user.email)} · ${state.me.role === 'admin' ? 'Admin' : 'Geschäftsführung'}</div></div>
+    <div><h2 id="acc-h">${esc(state.me.name)}</h2><div class="sub">${esc(Auth.session.user.email)} · ${({ admin: 'Admin', chef: 'Geschäftsführung', mitarbeiter: 'Mitarbeiter' })[state.me.role] || ''}</div></div>
     <label class="field">Neues Passwort<input type="password" name="pw" autocomplete="new-password" minlength="8"></label>
     <label class="field">Neues Passwort wiederholen<input type="password" name="pw2" autocomplete="new-password" minlength="8"></label>
     <p class="err" id="acc-err"></p>
