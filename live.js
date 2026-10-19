@@ -155,7 +155,9 @@ const Live = (() => {
     // Soll steht als Stunden pro Woche in der Einstellungs-Tabelle → auf den Monat umrechnen (Tage ÷ 7).
     // Werte über 60 sind ältere Monatswerte und werden direkt genommen.
     const monthSoll = s => s ? (s > 60 ? s : s * dim / 7) : null;
-    const list = rows.map(r => ({ name: r.name, ist: r.ist[sel], soll: r.soll ? monthSoll(r.soll) * frac : null, week: r.soll && r.soll <= 60 ? r.soll : null })).filter(r => r.ist !== null);
+    // Urlaub laut Jahreskalender: je Urlaubstag (Mo–Fr) sinkt das Soll um ein Fünftel des Wochen-Solls (30 h → 6 h)
+    const vacH = (r, i) => r.urlaub && r.urlaub[i] && r.soll && r.soll <= 60 ? r.urlaub[i] * r.soll / 5 : 0;
+    const list = rows.map(r => ({ name: r.name, ist: r.ist[sel], soll: r.soll ? Math.max(0, monthSoll(r.soll) * frac - vacH(r, sel)) : null, week: r.soll && r.soll <= 60 ? r.soll : null, vac: r.urlaub ? r.urlaub[sel] || 0 : 0 })).filter(r => r.ist !== null);
     const weeks = [...new Set(list.map(r => r.week).filter(Boolean))];
     const sollTxt = weeks.length === 1 ? `Soll = ${h1(weeks[0])} pro Woche, im ${ML[mm.m]} also ${h1(weeks[0] * dim / 7)}` : 'Soll je Trainer laut Einstellungs-Tabelle';
     const withSoll = list.filter(r => r.soll);
@@ -171,7 +173,7 @@ const Live = (() => {
     };
     const yearList = rows.filter(r => r.soll).map(r => {
       const ist = yIdx.reduce((s, i) => s + (r.ist[i] || 0), 0);
-      return { name: r.name, ist, soll: yIdx.reduce((s, i) => s + (r.ist[i] === null ? 0 : sollAt(r.soll, i)), 0) };
+      return { name: r.name, ist, soll: yIdx.reduce((s, i) => s + (r.ist[i] === null ? 0 : Math.max(0, sollAt(r.soll, i) - vacH(r, i))), 0), vac: yIdx.reduce((s, i) => s + (r.urlaub ? r.urlaub[i] || 0 : 0), 0) };
     }).filter(r => r.soll > 0);
     const yIst = yearList.reduce((s, r) => s + r.ist, 0), ySoll = yearList.reduce((s, r) => s + r.soll, 0);
     const barList = (items) => {
@@ -179,7 +181,7 @@ const Live = (() => {
       return items.map(r => {
         const p = r.soll ? r.ist / r.soll * 100 : null;
         const cls = p === null ? '' : p >= 95 ? 'good' : p >= 80 ? 'warn' : 'crit';
-        return `<li><span class="tr-name">${esc(r.name)}</span>
+        return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} Tage Urlaub</small>` : ''}</span>
           <span class="tr-bar"><span class="tr-ist ${cls}" style="width:${r.ist / mx * 100}%"></span>${r.soll ? `<span class="tr-soll" style="left:${r.soll / mx * 100}%" title="Soll ${h1(r.soll)}"></span>` : ''}</span>
           <span class="num tr-val">${h1(Math.round(r.ist))}${r.soll ? ` <small>/ ${h1(Math.round(r.soll))}</small>` : ''}</span>
           <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
@@ -188,12 +190,12 @@ const Live = (() => {
     const yearHtml = yearList.length ? `<section class="panel"><div class="panel-head"><h2>Jahresschnitt ${yr}</h2>
         <span class="sub">${MS[months[yIdx[0]].m]}–heute · Team: ${h1(Math.round(yIst))} von ${h1(Math.round(ySoll))} · <b>${pct0(yIst / ySoll * 100)}</b></span></div>
         <ul class="trainers">${barList(yearList)}</ul>
-        <p class="hint">Alle Stunden seit Januar gegenüber dem Soll seit Januar (laufender Monat anteilig bis heute).</p></section>` : '';
+        <p class="hint">Alle Stunden seit Januar gegenüber dem Soll seit Januar (laufender Monat anteilig bis heute). Urlaub laut Jahreskalender ist abgezogen: 6 h je Urlaubstag (Mo–Fr).</p></section>` : '';
     const maxV = Math.max(1, ...list.map(r => Math.max(r.ist, r.soll || 0))) * 1.08;
     const bars = list.map(r => {
       const p = r.soll ? r.ist / r.soll * 100 : null;
       const cls = p === null ? '' : p >= 95 ? 'good' : p >= 80 ? 'warn' : 'crit';
-      return `<li><span class="tr-name">${esc(r.name)}</span>
+      return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} Tage Urlaub</small>` : ''}</span>
         <span class="tr-bar"><span class="tr-ist ${cls}" style="width:${r.ist / maxV * 100}%"></span>${r.soll ? `<span class="tr-soll" style="left:${r.soll / maxV * 100}%" title="Soll ${h1(r.soll)}"></span>` : ''}</span>
         <span class="num tr-val">${h1(r.ist)}${r.soll ? ` <small>/ ${h1(r.soll)}</small>` : ''}</span>
         <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
