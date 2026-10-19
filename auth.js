@@ -118,6 +118,25 @@ const Auth = {
     return (await res.json())[0];
   },
 
+  async update(table, query, patch) {
+    const res = await this.fetch(`/rest/v1/${table}?${query}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify(patch),
+    });
+    return res.json();
+  },
+
+  async rpc(fn, args) {
+    const res = await this.fetch(`/rest/v1/rpc/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(args || {}),
+    });
+    const t = await res.text();
+    return t ? JSON.parse(t) : null;
+  },
+
   async upload(bucket, path, file) {
     await this.fetch(`/storage/v1/object/${bucket}/${path.split('/').map(encodeURIComponent).join('/')}`, {
       method: 'POST',

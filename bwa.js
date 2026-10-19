@@ -112,5 +112,5 @@ const BWA = (() => {
 
   async function read(file) { return parse(await extractLines(file)); }
 
-  return { read };
+  return { read, extractLines };
 })();

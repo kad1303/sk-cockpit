@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '18';
+const APP_VERSION = '19';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -291,7 +291,8 @@ function openCompany(id, year) {
     state.period = e.target.value === 'cum' ? 'cum' : +e.target.value;
     Fin.renderPeriod(state.period);
   });
-  const tabs = isStaff() ? TABS_STAFF : (TABS[id] || TABS.tennis);
+  let tabs = isStaff() ? TABS_STAFF : (TABS[id] || TABS.tennis);
+  if (id === 'tennis' && state.me && state.me.role === 'admin') tabs = tabs.concat([['shop', 'Shop']]); // Warenwirtschaft nur für Admin
   if (isStaff()) $('title').textContent = c.short; // keine BWA-Daten für Mitarbeiter
   else renderDash();
   $('tabs').innerHTML = tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join('');
@@ -321,7 +322,7 @@ function showTab(tab) {
   $('fin-controls').hidden = !fin;
   $('meta').hidden = !fin; // BWA-Stand nur bei den BWA-Zahlen zeigen
   $('live-body').hidden = fin;
-  if (!fin) { $('upload-panel').hidden = true; Live.render(tab, state.company, $('live-body')); }
+  if (!fin) { $('upload-panel').hidden = true; if (tab === 'shop') Shop.render($('live-body')); else Live.render(tab, state.company, $('live-body')); }
   else if (state.year && $('flow')) Fin.redrawCharts(state.period);
 }
 
@@ -534,7 +535,7 @@ let rt;
 window.addEventListener('resize', () => {
   clearTimeout(rt);
   rt = setTimeout(() => {
-    if (state.tab && state.tab !== 'finanzen' && $('live-body')) Live.render(state.tab, state.company, $('live-body'));
+    if (state.tab && state.tab !== 'finanzen' && state.tab !== 'shop' && $('live-body')) Live.render(state.tab, state.company, $('live-body'));
     else if (state.company && state.year && $('flow')) Fin.redrawCharts(state.period);
   }, 150);
 });
