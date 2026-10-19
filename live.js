@@ -239,7 +239,7 @@ const Live = (() => {
       done.slice().reverse().map(m => `<option value="${m}">${ML[m]} ${R.year}</option>`).join('');
     const line = (n, v, cls) => `<tr class="${cls || ''}"><td>${n}</td><td></td><td></td><td class="r num ${v < 0 ? 'down' : ''}">${eurS(v)}</td><td></td><td></td></tr>`;
     host.innerHTML = head('Rentabilität je Bereich',
-      'Umsatz und Kosten je Bereich aus der Finanzübersicht (Zahlungen; Umsätze inkl. Umsatzsteuer, die USt wird am Ende abgezogen). Trainergehälter werden nach den Stunden laut Stundenlisten verteilt (VS = Akademie, (VS) halb/halb, Club, sonst Privat; BZ zählt nicht). Geschäftsführung und Gemeinkosten werden erst am Ende abgezogen.',
+      'Umsatz und Kosten je Bereich aus der Finanzübersicht (Zahlungen; Umsätze inkl. Umsatzsteuer, die USt wird am Ende abgezogen). Alle Trainergehälter, auch die von Kevin und Philipp, werden nach den Stunden laut Stundenlisten verteilt (VS = Akademie, (VS) halb/halb, Club, sonst Privat; BZ zählt nicht). Gemeinkosten werden erst am Ende abgezogen.',
       `<select id="r-period" aria-label="Zeitraum">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><h2>${esc(label)}</h2><span class="sub">Deckungsbeitrag aller Bereiche: <b>${eurS(sumDb)}</b></span></div>
         <div class="tbl-wrap"><table class="rendite">
@@ -250,7 +250,7 @@ const Live = (() => {
             <td class="r num sub">${r.hours ? de0.format(r.hours) + ' h' + (hTot ? ` · ${de0.format(r.hours / hTot * 100)} %` : '') : ''}</td></tr>`).join('')}</tbody>
           <tfoot>
             <tr class="sum"><td>Summe Bereiche</td><td class="r num">${eur(sumRev)}</td><td></td><td class="r num"><b>${eurS(sumDb)}</b></td><td>${sumRev ? de0.format(sumDb / sumRev * 100) + ' %' : ''}</td><td></td></tr>
-            ${line('− Geschäftsführung (Kevin, Philipp)', -gf)}
+            ${gf ? line('− Geschäftsführung', -gf) : ''}
             ${line('− Gemeinkosten (Büro, Steuerberater, Versicherungen, Auto …)', -gem)}
             ${ust ? line('− Umsatzsteuer (an das Finanzamt gezahlt)', -ust) : ''}
             ${line('= Ergebnis laut Finanzübersicht', erg, 'sum key')}
