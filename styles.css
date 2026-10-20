@@ -362,3 +362,4 @@ table.abr .abr-det td { white-space: normal; color: var(--ink-2); font-size: 0.8
 table.abr tfoot td { font-weight: 600; border-top: 2px solid var(--border); }
 .hint-list { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 0.85rem; display: grid; gap: 4px; }
 .tile .tr-bar { margin-top: 8px; display: block; }
+table.abr .abr-sep td { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding-top: 14px; }
