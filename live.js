@@ -9,7 +9,7 @@
 const Live = (() => {
   const URL_ = (window.SK_CONFIG || {}).live || '';
   let data = null, loadedAt = 0, loading = null;
-  const ui = { umsatz: {}, trainer: {}, rendite: {} };
+  const ui = { umsatz: {}, trainer: {}, rendite: {}, ziele: {}, abr: {} };
   const $ = id => document.getElementById(id);
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs, parent) => {
@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -91,6 +91,8 @@ const Live = (() => {
     if (tab === 'trainer') drawTrainer(company, host, 'Trainerauslastung');
     if (tab === 'halle') drawHalle(host);
     if (tab === 'rendite') drawRendite(host);
+    if (tab === 'ziele') drawZiele(host);
+    if (tab === 'abrechnung') drawAbrechnung(host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
@@ -320,6 +322,84 @@ const Live = (() => {
       el('rect', { x, y: m.t + ih - h, width: bw, height: Math.max(h, 0), rx: 3, fill: 'var(--accent)', opacity: it.future ? 0.35 : 1 }, svg);
       if (it.top) txt({ x: x + bw / 2, y: m.t + ih - h - 4, 'text-anchor': 'middle', style: 'font-size:10px; fill: var(--ink-2)' }, it.top, svg);
       if (items.length <= 14 || i % 2 === 0) txt({ x: x + bw / 2, y: Hh - 6, 'text-anchor': 'middle' }, it.label, svg);
+    });
+  }
+
+  // ---------- Ziele (Privattraining Tennis + Fitness gegen Monatsziel) ----------
+  function drawZiele(host) {
+    const Z = data.ziele, st = ui.ziele;
+    const now = new Date(), last = Z.months.length - 1;
+    const sel = st.month === undefined ? last : st.month;
+    const mo = Z.months[sel], isCur = sel === last;
+    const dim = new Date(mo.y, mo.m + 1, 0).getDate();
+    const day = isCur ? now.getDate() : dim;
+    const goal = { tennis: Z.ziele.tennis || 0, fitness: Z.ziele.fitness || 0 };
+    const val = { tennis: mo.tennis, fitness: mo.fitness };
+    const tot = val.tennis + val.fitness, gTot = goal.tennis + goal.fitness;
+    const m2 = v => de2.format(v) + ' €';
+    const opts = Z.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[Z.months[i].m]} ${Z.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
+    const bar = (v, g) => { const p = g ? v / g * 100 : 0; const cls = p >= 100 ? 'good' : p >= 80 ? 'warn' : 'crit'; return `<span class="tr-bar"><span class="tr-ist ${cls}" style="width:${Math.min(100, p)}%"></span></span>`; };
+    const tile = (label, v, g, extra) => `<article class="tile"><div class="label">${label}</div><div class="value num">${eur(v)}</div>
+      <div class="what">Ziel ${eur(g)} · <b>${g ? pct0(v / g * 100) : '–'}</b>${g > v ? ` · es fehlen ${eur(g - v)}` : ' · Ziel erreicht'}</div>${bar(v, g)}${extra || ''}</article>`;
+    const prog = v => isCur && day < dim ? `<div class="what">Hochgerechnet auf den Monat: <b>${eur(v / day * dim)}</b></div>` : '';
+    const rest = isCur && day < dim && gTot > tot ? `<p class="sub">Für das Gesamtziel fehlen noch ${m2(gTot - tot)} – das sind ${m2((gTot - tot) / (dim - day))} pro restlichem Kalendertag (${dim - day} Tage).</p>` : '';
+    const hist = Z.months.map((x, i) => `<li><span class="tr-name">${MS[x.m]} ${String(x.y).slice(2)}</span>${bar(x.tennis + x.fitness, gTot)}<span class="num tr-val">${eur(x.tennis + x.fitness)}</span><span class="num tr-pct">${gTot ? pct0((x.tennis + x.fitness) / gTot * 100) : '–'}</span></li>`).join('');
+    host.innerHTML = head('Ziele', 'Einnahmen aus Privattraining (Tennis: Pro + Asi Coach, ohne Club und Vertragsspieler; Fitness: Training bei Alex) laut Stundenlisten, verglichen mit den Monatszielen. Die Ziele stehen in der Einstellungs-Tabelle im Blatt „Ziele“.', `<select id="z-month" aria-label="Monat">${opts}</select>`) +
+      `<section class="tiles tiles-3">${tile('Gesamt', tot, gTot, prog(tot))}${tile('Tennis', val.tennis, goal.tennis, prog(val.tennis) + `<div class="what">${mo.kunden.tennis} Kunden</div>`)}${tile('Fitness', val.fitness, goal.fitness, prog(val.fitness) + `<div class="what">${mo.kunden.fitness} Kunden${mo.pt ? ` · davon PT ${eur(mo.pt)}` : ''}</div>`)}</section>
+      <section class="panel"><div class="panel-head"><h2>${ML[mo.m]} ${mo.y}${isCur ? ' (bis heute)' : ''}</h2></div>${rest || '<p class="sub">' + (tot >= gTot ? 'Das Monatsziel ist erreicht.' : 'Monat abgeschlossen.') + '</p>'}
+      <p class="hint">Grundlage sind die eingetragenen Trainings in den Stundenlisten, bewertet mit den Preisen aus dem Blatt „Preise“ – also eine Planabrechnung, keine Zahlungseingänge.</p></section>
+      <section class="panel"><div class="panel-head"><h2>Letzte Monate</h2><span class="sub">Gesamtziel ${eur(gTot)}</span></div><ul class="trainers">${hist}</ul></section>`;
+    const s = $('z-month'); s.value = String(sel);
+    s.addEventListener('change', e => { st.month = +e.target.value; drawZiele(host); bindRefresh(host, 'ziele'); });
+  }
+
+  // ---------- Trainingsabrechnung (aus den Stundenlisten) ----------
+  const PROD_ORDER = ['Pro Coach 60', 'Pro Coach 90', 'Pro Coach 120', 'Asi Coach 60', 'Asi Coach 90', 'Asi Coach 120', '2er Pro Coach 60', '2er Pro Coach 90', '2er Pro Coach 120',
+    '2er Asi Coach 60', '2er Asi Coach 90', '3er Pro Coach 60', '3er Pro Coach 90', '3er Pro Coach 120', '3er Asi Coach 60', 'Fitness', 'Fitness PT', 'Club 60', 'Club 90'];
+  function drawAbrechnung(host) {
+    const A = data.abrechnung, st = ui.abr;
+    const last = A.months.length - 1;
+    const sel = st.month === undefined ? Math.max(0, last - 1) : st.month;
+    const mo = A.months[sel], view = st.view || 'pro', q = (st.q || '').toLowerCase();
+    const m2 = v => de2.format(v) + ' €';
+    const unit = v => v ? de2.format(v).replace(/,00$/, '').replace(/(,\d)0$/, '$1') : '';
+    const all = mo.rows.filter(r => r.tab === view);
+    const rows = all.filter(r => !q || r.name.toLowerCase().includes(q));
+    const used = PROD_ORDER.filter(p => all.some(r => r.units[p])).concat([...new Set(all.flatMap(r => Object.keys(r.units)))].filter(p => PROD_ORDER.indexOf(p) < 0));
+    const sum = t => mo.rows.filter(r => r.tab === t).reduce((s, r) => s + r.summe, 0);
+    const opts = A.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[A.months[i].m]} ${A.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
+    const views = [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club'], ['fitness', 'Fitness']];
+    const short = p => p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
+    const body = rows.map((r, i) => `<tr class="abr-row" data-i="${i}"><td><b>${esc(r.name)}</b></td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
+        <td class="r num">${r.vertrag ? m2(r.vertrag) : ''}</td><td class="r num">${r.zusatz ? m2(r.zusatz) : ''}</td><td class="r num"><b>${m2(r.summe)}</b></td></tr>
+        <tr class="abr-det" data-d="${i}" hidden><td colspan="${used.length + 4}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
+    const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
+    host.innerHTML = head('Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
+      `<section class="tiles tiles-3">${views.map(([k, l]) => `<article class="tile"><div class="label">${l}</div><div class="value num">${eur(sum(k))}</div><div class="what">${mo.rows.filter(r => r.tab === k).length} Kunden</div></article>`).join('')}</section>
+      <section class="panel"><div class="panel-head"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
+        <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button></div></div>
+        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Vertrag</th><th class="r">Zusatz</th><th class="r">Summe</th></tr>
+          <tr class="price"><th>Preis je Einheit</th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th><th></th><th></th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${used.length + 4}" class="sub">Keine Einträge.</td></tr>`}</tbody>
+        <tfoot><tr class="sum"><td>Summe Einheiten</td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}<td></td><td></td><td></td></tr>
+          <tr class="sum"><td>Wert pro Produkt</td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num">${m2(rows.reduce((s, r) => s + r.vertrag, 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.zusatz, 0))}</td><td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td></tr></tfoot></table></div></section>
+      ${mo.hinweise.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${mo.hinweise.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
+      <p class="hint">Hallenkosten, Vertrags- und Turnierkosten sowie individuelle Absprachen stehen nicht in den Stundenlisten und fehlen hier. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet.</p>`;
+    const redraw = () => { drawAbrechnung(host); bindRefresh(host, 'abrechnung'); };
+    $('a-month').value = String(sel);
+    $('a-month').addEventListener('change', e => { st.month = +e.target.value; redraw(); });
+    host.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.v; redraw(); }));
+    $('a-q').addEventListener('input', e => { st.q = e.target.value; const p = e.target.selectionStart; redraw(); const i = $('a-q'); i.focus(); i.setSelectionRange(p, p); });
+    host.querySelectorAll('.abr-row').forEach(tr => tr.addEventListener('click', () => { const d = host.querySelector(`[data-d="${tr.dataset.i}"]`); d.hidden = !d.hidden; }));
+    $('a-csv').addEventListener('click', () => {
+      const csvNum = v => v ? String(Math.round(v * 100) / 100).replace('.', ',') : '';
+      const lines = [['Name'].concat(used, ['Vertrag Monatsbeitrag', 'Zusatzkosten', 'Rechnungssumme']).join(';'),
+        ['Preis'].concat(used.map(p => csvNum(mo.prices[p] || 0)), ['', '', '']).join(';')]
+        .concat(rows.map(r => [r.name.replace(/;/g, ',')].concat(used.map(p => csvNum(r.units[p] || 0)), [csvNum(r.vertrag), csvNum(r.zusatz), csvNum(r.summe)]).join(';')));
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+      a.download = `Trainingsabrechnung_${views.find(v => v[0] === view)[1].replace(/\W+/g, '-')}_${ML[mo.m]}_${mo.y}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
     });
   }
 

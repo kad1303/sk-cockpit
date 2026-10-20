@@ -352,3 +352,13 @@ table.shop tr.muted td { opacity: 0.55; }
 input[type=month] { font: inherit; color: var(--ink); background: var(--page); border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; }
 .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .pos-row .num-in { width: 100%; }
+
+/* Trainingsabrechnung */
+table.abr th, table.abr td { white-space: nowrap; }
+table.abr tr.price th { font-weight: 400; color: var(--muted); font-size: 0.75rem; padding-top: 0; }
+table.abr .abr-row { cursor: pointer; }
+table.abr .abr-row:hover td { background: var(--track); }
+table.abr .abr-det td { white-space: normal; color: var(--ink-2); font-size: 0.82rem; background: var(--page); }
+table.abr tfoot td { font-weight: 600; border-top: 2px solid var(--border); }
+.hint-list { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 0.85rem; display: grid; gap: 4px; }
+.tile .tr-bar { margin-top: 8px; display: block; }

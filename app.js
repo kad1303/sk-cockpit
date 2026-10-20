@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '20';
+const APP_VERSION = '21';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -292,7 +292,7 @@ function openCompany(id, year) {
     Fin.renderPeriod(state.period);
   });
   let tabs = isStaff() ? TABS_STAFF : (TABS[id] || TABS.tennis);
-  if (id === 'tennis' && state.me && state.me.role === 'admin') tabs = tabs.concat([['shop', 'Shop']]); // Warenwirtschaft nur für Admin
+  if (id === 'tennis' && state.me && state.me.role === 'admin') tabs = tabs.concat([['shop', 'Shop'], ['abrechnung', 'Trainingsabrechnung']]); // Warenwirtschaft nur für Admin
   if (isStaff()) $('title').textContent = c.short; // keine BWA-Daten für Mitarbeiter
   else renderDash();
   $('tabs').innerHTML = tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join('');
@@ -309,7 +309,7 @@ const WORDMARKS = ['tennis', 'fitness'];
 
 // Reiter: „Finanzen“ kommt aus der BWA, die übrigen sind Live-Daten aus Google Drive / eBuSy
 const TABS = {
-  tennis: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['rendite', 'Rentabilität'], ['trainer', 'Trainer'], ['halle', 'Halle']],
+  tennis: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['rendite', 'Rentabilität'], ['trainer', 'Trainer'], ['halle', 'Halle'], ['ziele', 'Ziele']],
   fitness: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz']],
 };
 
