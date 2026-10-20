@@ -363,3 +363,6 @@ table.abr tfoot td { font-weight: 600; border-top: 2px solid var(--border); }
 .hint-list { margin: 6px 0 0; padding-left: 18px; color: var(--ink-2); font-size: 0.85rem; display: grid; gap: 4px; }
 .tile .tr-bar { margin-top: 8px; display: block; }
 table.abr .abr-sep td { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); padding-top: 14px; }
+.tr-name .vac { display: block; font-weight: 500; font-size: 0.72rem; color: var(--muted); line-height: 1.3; margin-top: 1px; }
+.trainers li { grid-template-columns: 130px minmax(80px, 1fr) 130px 52px; }
+@media (max-width: 520px) { .trainers li { grid-template-columns: 96px minmax(0, 1fr) 46px; } }

@@ -175,7 +175,7 @@ const Live = (() => {
     };
     const yearList = rows.filter(r => r.soll).map(r => {
       const ist = yIdx.reduce((s, i) => s + (r.ist[i] || 0), 0);
-      return { name: r.name, ist, soll: yIdx.reduce((s, i) => s + (r.ist[i] === null ? 0 : Math.max(0, sollAt(r.soll, i) - vacH(r, i))), 0), vac: yIdx.reduce((s, i) => s + (r.urlaub ? r.urlaub[i] || 0 : 0), 0) };
+      return { name: r.name, week: r.soll <= 60 ? r.soll : null, ist, soll: yIdx.reduce((s, i) => s + (r.ist[i] === null ? 0 : Math.max(0, sollAt(r.soll, i) - vacH(r, i))), 0), vac: yIdx.reduce((s, i) => s + (r.urlaub ? r.urlaub[i] || 0 : 0), 0) };
     }).filter(r => r.soll > 0);
     const yIst = yearList.reduce((s, r) => s + r.ist, 0), ySoll = yearList.reduce((s, r) => s + r.soll, 0);
     const barList = (items) => {
@@ -183,7 +183,7 @@ const Live = (() => {
       return items.map(r => {
         const p = r.soll ? r.ist / r.soll * 100 : null;
         const cls = p === null ? '' : p >= 95 ? 'good' : p >= 80 ? 'warn' : 'crit';
-        return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} Tage Urlaub</small>` : ''}</span>
+        return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} ${r.vac === 1 ? 'Urlaubstag' : 'Urlaubstage'}${r.week ? ` · Soll −${h1(r.vac * r.week / 5)}` : ''}</small>` : ''}</span>
           <span class="tr-bar"><span class="tr-ist ${cls}" style="width:${r.ist / mx * 100}%"></span>${r.soll ? `<span class="tr-soll" style="left:${r.soll / mx * 100}%" title="Soll ${h1(r.soll)}"></span>` : ''}</span>
           <span class="num tr-val">${h1(Math.round(r.ist))}${r.soll ? ` <small>/ ${h1(Math.round(r.soll))}</small>` : ''}</span>
           <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
@@ -197,7 +197,7 @@ const Live = (() => {
     const bars = list.map(r => {
       const p = r.soll ? r.ist / r.soll * 100 : null;
       const cls = p === null ? '' : p >= 95 ? 'good' : p >= 80 ? 'warn' : 'crit';
-      return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} Tage Urlaub</small>` : ''}</span>
+      return `<li><span class="tr-name">${esc(r.name)}${r.vac ? `<small class="vac">${r.vac} ${r.vac === 1 ? 'Urlaubstag' : 'Urlaubstage'}${r.week ? ` · Soll −${h1(r.vac * r.week / 5)}` : ''}</small>` : ''}</span>
         <span class="tr-bar"><span class="tr-ist ${cls}" style="width:${r.ist / maxV * 100}%"></span>${r.soll ? `<span class="tr-soll" style="left:${r.soll / maxV * 100}%" title="Soll ${h1(r.soll)}"></span>` : ''}</span>
         <span class="num tr-val">${h1(r.ist)}${r.soll ? ` <small>/ ${h1(r.soll)}</small>` : ''}</span>
         <span class="num tr-pct ${cls}">${p === null ? '–' : pct0(p)}</span></li>`;
