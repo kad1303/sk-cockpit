@@ -202,10 +202,10 @@ const Live = (() => {
     }).join('');
     return {
       controls: `<select id="${idPrefix}-month" aria-label="Monat">${opts}</select>`,
-      html: yearHtml + `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
+      html: `<section class="panel"><div class="panel-head"><h2>${ML[mm.m]} ${mm.y}${isCur ? ' (bis heute)' : ''}</h2>
           ${tSoll ? `<span class="sub">Team: ${h1(tIst)} von ${h1(tSoll)} · <b>${pct0(tIst / tSoll * 100)}</b></span>` : ''}</div>
           <ul class="trainers">${bars || '<li class="sub">Keine Stundenliste für diesen Monat gefunden.</li>'}</ul>
-          <p class="hint"><b>${sollTxt}${isCur ? ', anteilig bis heute' : ''}.</b> Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll. Grün ab 95 %, gelb ab 80 %.</p></section>`,
+          <p class="hint"><b>${sollTxt}${isCur ? ', anteilig bis heute' : ''}.</b> Balken = gearbeitete Stunden laut Stundenliste, Strich = Soll. Grün ab 95 %, gelb ab 80 %.</p></section>` + yearHtml,
       bind: redraw => { const s = $(idPrefix + '-month'); s.value = String(sel); s.addEventListener('change', e => { st.month = +e.target.value; redraw(); }); },
     };
   }
