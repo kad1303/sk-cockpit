@@ -366,3 +366,4 @@ table.abr .abr-sep td { font-weight: 700; font-size: 0.8rem; text-transform: upp
 .tr-name .vac { display: block; font-weight: 500; font-size: 0.72rem; color: var(--muted); line-height: 1.3; margin-top: 1px; }
 .trainers li { grid-template-columns: 130px minmax(80px, 1fr) 130px 52px; }
 @media (max-width: 520px) { .trainers li { grid-template-columns: 96px minmax(0, 1fr) 46px; } }
+.chip-ok { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--good); background: var(--good-wash, rgba(46,160,90,0.12)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }

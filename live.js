@@ -372,18 +372,24 @@ const Live = (() => {
     const views = [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club'], ['fitness', 'Fitness']];
     const short = p => p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     const firstPriv = rows.findIndex(r => !r.vertrag);
-    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${used.length + 5}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${used.length + 5}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
-        <td class="r num">${r.vertrag ? m2(r.vertrag) : ''}</td><td class="r num">${r.zusatz ? m2(r.zusatz) : ''}</td><td class="r num"><b>${m2(r.summe)}</b></td></tr>
-        <tr class="abr-det" data-d="${i}" hidden><td colspan="${used.length + 5}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
+    const ym = mo.y + '-' + String(mo.m + 1).padStart(2, '0');
+    const ck = s => s.toLowerCase().replace(/\(.*?\)/g, ' ').replace(/\./g, ' ').replace(/ß/g, 'ss').replace(/\s+/g, ' ').trim();
+    A.lex = A.lex || {};
+    const lexId = r => A.lex[ym + '|' + ck(r.name)];
+    const isCur = sel === last;
+    const lexCell = r => `<td class="r">${lexId(r) ? '<span class="chip-ok">Entwurf ✓</span>' : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
+    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${used.length + 6}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${used.length + 6}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
+        <td class="r num">${r.vertrag ? m2(r.vertrag) : ''}</td><td class="r num">${r.zusatz ? m2(r.zusatz) : ''}</td><td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
+        <tr class="abr-det" data-d="${i}" hidden><td colspan="${used.length + 6}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
     host.innerHTML = head('Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
-        <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button></div></div>
-        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Vertrag</th><th class="r">Zusatz</th><th class="r">Summe</th></tr>
-          <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th><th></th><th></th></tr></thead>
-        <tbody>${body || `<tr><td colspan="${used.length + 5}" class="sub">Keine Einträge.</td></tr>`}</tbody>
-        <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}<td></td><td></td><td></td></tr>
-          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num">${m2(rows.reduce((s, r) => s + r.vertrag, 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.zusatz, 0))}</td><td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td></tr></tfoot></table></div></section>
+        <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button>${!isCur && all.some(r => !lexId(r) && r.summe > 0) ? `<button class="btn" type="button" id="a-lexall">Alle als Lexoffice-Entwurf (${all.filter(r => !lexId(r) && r.summe > 0).length})</button>` : ''}</div></div>
+        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Vertrag</th><th class="r">Zusatz</th><th class="r">Summe</th><th class="r">Lexoffice</th></tr>
+          <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th><th></th><th></th><th></th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${used.length + 6}" class="sub">Keine Einträge.</td></tr>`}</tbody>
+        <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}<td></td><td></td><td></td><td></td></tr>
+          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num">${m2(rows.reduce((s, r) => s + r.vertrag, 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.zusatz, 0))}</td><td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
       ${mo.hinweise.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${mo.hinweise.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
       <p class="hint">Hallenkosten, Vertrags- und Turnierkosten sowie individuelle Absprachen stehen nicht in den Stundenlisten und fehlen hier. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).</p>`;
     const redraw = () => { drawAbrechnung(host); bindRefresh(host, 'abrechnung'); };
@@ -392,6 +398,32 @@ const Live = (() => {
     host.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.v; redraw(); }));
     $('a-q').addEventListener('input', e => { st.q = e.target.value; const p = e.target.selectionStart; redraw(); const i = $('a-q'); i.focus(); i.setSelectionRange(p, p); });
     host.querySelectorAll('.abr-row').forEach(tr => tr.addEventListener('click', () => { const d = host.querySelector(`[data-d="${tr.dataset.i}"]`); d.hidden = !d.hidden; }));
+    // Entwürfe in Lexoffice anlegen (je Aufruf max. 12 Kunden, damit Google nicht abbricht)
+    const lexSend = async (names, btn) => {
+      if (!names.length) return;
+      const label = btn.textContent; btn.disabled = true;
+      let ok = 0, noContact = 0; const errs = [];
+      try {
+        for (let i = 0; i < names.length; i += 12) {
+          btn.textContent = `Lege an … ${Math.min(i + 12, names.length)}/${names.length}`;
+          const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'lexTrainDraft', co: 'tennis', ym, names: names.slice(i, i + 12) }) });
+          const d = await res.json();
+          if (!d.ok) throw new Error(d.error === 'forbidden' ? 'Nur für den Admin-Zugang.' : d.error || 'Keine Antwort');
+          d.results.forEach(x => { if (x.id) { A.lex[ym + '|' + ck(x.name)] = x.id; if (!x.skipped) ok++; if (x.contact === false) noContact++; } else errs.push(x.name + ': ' + x.error); });
+        }
+        toast(`${ok} Entwürfe in Lexoffice angelegt${noContact ? ` · ${noContact} ohne passenden Lexoffice-Kontakt (Adresse im Entwurf ergänzen)` : ''}`);
+        if (errs.length) alertBox(errs);
+      } catch (e) { toast(e.message || String(e)); }
+      btn.disabled = false; btn.textContent = label; redraw();
+    };
+    const alertBox = errs => { const p = document.createElement('section'); p.className = 'panel'; p.innerHTML = `<h2>Nicht angelegt</h2><ul class="hint-list">${errs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; host.appendChild(p); };
+    host.querySelectorAll('[data-lex]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); lexSend([b.dataset.lex], b); }));
+    const la = $('a-lexall');
+    if (la) la.addEventListener('click', () => {
+      const names = all.filter(r => !lexId(r) && r.summe > 0).map(r => r.name);
+      if (la.dataset.armed) lexSend(names, la);
+      else { la.dataset.armed = '1'; la.textContent = `Wirklich ${names.length} Entwürfe für ${ML[mo.m]} anlegen?`; la.classList.add('warn-btn'); }
+    });
     $('a-csv').addEventListener('click', () => {
       const csvNum = v => v ? String(Math.round(v * 100) / 100).replace('.', ',') : '';
       const lines = [['Name', 'Vorname'].concat(used, ['Vertrag Monatsbeitrag', 'Zusatzkosten', 'Rechnungssumme']).join(';'),
