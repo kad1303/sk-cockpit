@@ -378,20 +378,20 @@ const Live = (() => {
     const lexId = r => A.lex[ym + '|' + ck(r.name)];
     const isCur = sel === last;
     const lexCell = r => `<td class="r">${lexId(r) ? '<span class="chip-ok">Entwurf ✓</span>' : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
-    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${used.length + 6}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${used.length + 6}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
-        <td class="r num">${r.vertrag ? m2(r.vertrag) : ''}</td><td class="r num">${r.zusatz ? m2(r.zusatz) : ''}</td><td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
-        <tr class="abr-det" data-d="${i}" hidden><td colspan="${used.length + 6}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
+    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${used.length + 7}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${used.length + 7}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
+        <td class="r num">${r.halle ? m2(r.halle) : ''}</td><td class="r num">${r.vertrag ? m2(r.vertrag) : ''}</td><td class="r num">${r.zusatz ? m2(r.zusatz) : ''}</td><td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
+        <tr class="abr-det" data-d="${i}" hidden><td colspan="${used.length + 7}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
     host.innerHTML = head('Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
         <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button>${!isCur && all.some(r => !lexId(r) && r.summe > 0) ? `<button class="btn" type="button" id="a-lexall">Alle als Lexoffice-Entwurf (${all.filter(r => !lexId(r) && r.summe > 0).length})</button>` : ''}</div></div>
-        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Vertrag</th><th class="r">Zusatz</th><th class="r">Summe</th><th class="r">Lexoffice</th></tr>
-          <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th><th></th><th></th><th></th></tr></thead>
-        <tbody>${body || `<tr><td colspan="${used.length + 6}" class="sub">Keine Einträge.</td></tr>`}</tbody>
-        <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}<td></td><td></td><td></td><td></td></tr>
-          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num">${m2(rows.reduce((s, r) => s + r.vertrag, 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.zusatz, 0))}</td><td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
+        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Hallen&shy;kosten</th><th class="r">Vertrag</th><th class="r">Zusatz</th><th class="r">Summe</th><th class="r">Lexoffice</th></tr>
+          <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th><th></th><th></th><th></th><th></th></tr></thead>
+        <tbody>${body || `<tr><td colspan="${used.length + 7}" class="sub">Keine Einträge.</td></tr>`}</tbody>
+        <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}<td></td><td></td><td></td><td></td><td></td></tr>
+          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num">${m2(rows.reduce((s, r) => s + (r.halle || 0), 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.vertrag, 0))}</td><td class="r num">${m2(rows.reduce((s, r) => s + r.zusatz, 0))}</td><td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
       ${mo.hinweise.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${mo.hinweise.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
-      <p class="hint">Hallenkosten, Vertrags- und Turnierkosten sowie individuelle Absprachen stehen nicht in den Stundenlisten und fehlen hier. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).</p>`;
+      <p class="hint">Hallenkosten: Stundenpreis laut eBuSy zur Trainingszeit × Dauer ÷ Anzahl Spieler, nur für Kunden ohne Hallenabo (Blatt „Hallenkosten-Kunden“). Vertrags- und Turnierkosten sowie individuelle Absprachen fehlen. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).</p>`;
     const redraw = () => { drawAbrechnung(host); bindRefresh(host, 'abrechnung'); };
     $('a-month').value = String(sel);
     $('a-month').addEventListener('change', e => { st.month = +e.target.value; redraw(); });
@@ -426,9 +426,9 @@ const Live = (() => {
     });
     $('a-csv').addEventListener('click', () => {
       const csvNum = v => v ? String(Math.round(v * 100) / 100).replace('.', ',') : '';
-      const lines = [['Name', 'Vorname'].concat(used, ['Vertrag Monatsbeitrag', 'Zusatzkosten', 'Rechnungssumme']).join(';'),
-        ['Preis', ''].concat(used.map(p => csvNum(mo.prices[p] || 0)), ['', '', '']).join(';')]
-        .concat(rows.map(r => split(r.name).map(x => x.replace(/;/g, ',')).concat(used.map(p => csvNum(r.units[p] || 0)), [csvNum(r.vertrag), csvNum(r.zusatz), csvNum(r.summe)]).join(';')));
+      const lines = [['Name', 'Vorname'].concat(used, ['Hallenkosten', 'Vertrag Monatsbeitrag', 'Zusatzkosten', 'Rechnungssumme']).join(';'),
+        ['Preis', ''].concat(used.map(p => csvNum(mo.prices[p] || 0)), ['', '', '', '']).join(';')]
+        .concat(rows.map(r => split(r.name).map(x => x.replace(/;/g, ',')).concat(used.map(p => csvNum(r.units[p] || 0)), [csvNum(r.halle || 0), csvNum(r.vertrag), csvNum(r.zusatz), csvNum(r.summe)]).join(';')));
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
       a.download = `Trainingsabrechnung_${views.find(v => v[0] === view)[1].replace(/\W+/g, '-')}_${ML[mo.m]}_${mo.y}.csv`;
