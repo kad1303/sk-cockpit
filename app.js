@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '24';
+const APP_VERSION = '25';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -309,8 +309,8 @@ const WORDMARKS = ['tennis', 'fitness'];
 
 // Reiter: „Finanzen“ kommt aus der BWA, die übrigen sind Live-Daten aus Google Drive / eBuSy
 const TABS = {
-  tennis: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['rendite', 'Rentabilität'], ['trainer', 'Trainer'], ['halle', 'Halle'], ['ziele', 'Ziele']],
-  fitness: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz']],
+  tennis: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['rendite', 'Rentabilität'], ['trainer', 'Trainer'], ['halle', 'Halle'], ['ziele', 'Ziele'], ['buchhaltung', 'Buchhaltung']],
+  fitness: [['finanzen', 'Finanzen'], ['umsatz', 'Umsatz'], ['buchhaltung', 'Buchhaltung']],
 };
 
 function showTab(tab) {

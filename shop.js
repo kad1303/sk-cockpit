@@ -291,7 +291,8 @@ const Shop = (() => {
       <div class="actions"><button class="btn ghost sm" type="button" id="f-add">Position</button><button class="btn ghost sm" type="button" id="f-rab">Rabatt</button></div>
       <div class="form-grid">${field('Rechnungsdatum', 'datum', todayIso(), 'date')}${field('Leistungsdatum', 'ldatum', todayIso(), 'date')}</div>
       <div id="f-sum" class="inv-sum"></div><p class="err" id="f-err"></p>
-      <div class="actions"><button class="btn" type="submit" id="f-ok">Rechnung erstellen</button></div></form>`, true);
+      <div class="actions"><button class="btn" type="button" id="f-lex">Als Lexoffice-Entwurf anlegen</button><button class="btn ghost" type="submit" id="f-ok">Rechnung im Cockpit erstellen</button></div>
+      <p class="hint">Lexoffice-Entwurf: Die Rechnung erscheint in Lexoffice unter Rechnungen → Entwürfe. Dort prüfen, abschließen und versenden – erst dann ist sie gültig. Der Bestand wird beim Anlegen des Entwurfs abgebucht.</p></form>`, true);
     const f = d.el.querySelector('form');
     f.k_name.addEventListener('change', () => {
       const c = D.customers.find(x => x.name === f.k_name.value);
@@ -333,6 +334,26 @@ const Shop = (() => {
     $('f-rab').addEventListener('click', () => { pos.push({ article_id: null, text: 'Rabatt', menge: 1, preis: -5, ust: 19 }); paintPos(); });
     paintPos();
     let armed = false;
+    $('f-lex').addEventListener('click', async () => {
+      const err = $('f-err'), btn = $('f-lex');
+      const k = { name: f.k_name.value.trim(), firma: f.k_firma.value.trim(), strasse: f.k_strasse.value.trim(), plz_ort: f.k_plz_ort.value.trim(), email: f.k_email.value.trim(), ustid: f.k_ustid.value.trim() };
+      const p = pos.filter(x => x.text && +x.menge);
+      if (!k.name && !k.firma) { err.textContent = 'Bitte Kundenname eingeben.'; return; }
+      if (!p.length) { err.textContent = 'Bitte mindestens eine Position mit Text und Menge.'; return; }
+      if (sums() <= 0) { err.textContent = 'Der Gesamtbetrag muss größer als 0 sein.'; return; }
+      btn.disabled = true; btn.textContent = 'Lege Entwurf an …'; err.textContent = '';
+      try {
+        if (f.k_save.checked) await Auth.insert('shop_customers', k);
+        const positionen = p.map(x => ({ article_id: x.article_id, artnr: ((D.articles.find(a => a.id === x.article_id) || {}).artnr) || '', text: x.text, menge: +x.menge, preis: +x.preis, ust: +x.ust }));
+        const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'lexDraft', co: 'tennis', invoice: { kunde: k, positionen, datum: f.datum.value, leistungsdatum: f.ldatum.value } }) });
+        const r = await res.json();
+        if (!r.ok) throw new Error(r.error === 'forbidden' ? 'Nur für den Admin-Zugang.' : (r.error || 'Lexoffice hat nicht geantwortet.'));
+        for (const x of positionen) if (x.article_id) await Auth.insert('shop_movements', { article_id: x.article_id, menge: -x.menge, art: 'verkauf', beleg: 'Lexoffice-Entwurf', datum: f.datum.value, notiz: k.firma || k.name });
+        if (pre.orderId) await Auth.update('shop_orders', 'id=eq.' + pre.orderId, { status: 'abgerechnet', notiz: 'Lexoffice-Entwurf angelegt', updated_at: new Date().toISOString() });
+        d.close(); await loadAll(); draw();
+        toast('Entwurf in Lexoffice angelegt – dort unter Rechnungen → Entwürfe abschließen');
+      } catch (x) { err.textContent = x.message || String(x); btn.disabled = false; btn.textContent = 'Als Lexoffice-Entwurf anlegen'; }
+    });
     f.addEventListener('submit', async e => {
       e.preventDefault();
       const err = $('f-err'), btn = $('f-ok');
@@ -350,7 +371,7 @@ const Shop = (() => {
         d.close(); await loadAll(); view = 'rechnungen'; draw();
         toast(`Rechnung ${nr(inv.nummer)} erstellt`);
         openInvoicePdf(D.invoices.find(i => i.id === inv.id) || inv);
-      } catch (x) { err.textContent = friendlyAuthError(x); btn.disabled = false; btn.textContent = 'Rechnung erstellen'; armed = false; btn.classList.remove('warn-btn'); }
+      } catch (x) { err.textContent = friendlyAuthError(x); btn.disabled = false; btn.textContent = 'Rechnung im Cockpit erstellen'; armed = false; btn.classList.remove('warn-btn'); }
     });
   }
 

@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'], buchhaltung: ['lexoffice'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -82,7 +82,7 @@ const Live = (() => {
   }
 
   function draw(tab, company, host) {
-    const part = tab;
+    const part = NEEDS[tab] ? NEEDS[tab][0] : tab;
     if (data[part] && data[part].error) {
       host.innerHTML = `<section class="panel empty"><h2>Fehler beim Lesen</h2><p class="sub">${esc(data[part].error)}</p></section>`;
       return;
@@ -93,6 +93,7 @@ const Live = (() => {
     if (tab === 'rendite') drawRendite(host);
     if (tab === 'ziele') drawZiele(host);
     if (tab === 'abrechnung') drawAbrechnung(host);
+    if (tab === 'buchhaltung') drawBuchhaltung(company, host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = 'Lädt …';
@@ -401,6 +402,33 @@ const Live = (() => {
       a.download = `Trainingsabrechnung_${views.find(v => v[0] === view)[1].replace(/\W+/g, '-')}_${ML[mo.m]}_${mo.y}.csv`;
       document.body.appendChild(a); a.click(); a.remove();
     });
+  }
+
+  // ---------- Buchhaltung (Lexoffice, nur lesend) ----------
+  function drawBuchhaltung(company, host) {
+    const L = (data.lexoffice || {})[company] || {};
+    const title = head('Buchhaltung', 'Live aus Lexoffice: offene Rechnungen und Einnahmen/Ausgaben je Monat (Belegdatum, Bruttobeträge). Die BWA im Reiter „Finanzen“ bleibt die verbindliche Zahl.');
+    if (!L.connected) { host.innerHTML = title + `<section class="panel empty"><h2>Lexoffice noch nicht verbunden</h2><p class="sub">Der Schlüssel für diese Firma fehlt. Er wird vom Admin im Google-Baustein unter Projekteinstellungen → Skripteigenschaften als <code>LEXOFFICE_KEY_${company.toUpperCase()}</code> eingetragen.</p></section>`; return; }
+    if (L.error) { host.innerHTML = title + `<section class="panel empty"><h2>Lexoffice antwortet nicht</h2><p class="sub">${esc(L.error)}</p></section>`; return; }
+    const m2 = v => de2.format(v) + ' €';
+    const now = new Date(), cm = L.year === now.getFullYear() ? now.getMonth() : 11;
+    const sumTo = a => a.slice(0, cm + 1).reduce((s, v) => s + v, 0);
+    const today = now.toISOString().slice(0, 10);
+    const tile = (l, v, sub, cls) => `<article class="tile"><div class="label">${l}</div><div class="value num ${cls || ''}">${eur(v)}</div><div class="what">${sub}</div></article>`;
+    const list = (t, x) => `<section class="panel"><div class="panel-head"><h2>${t}</h2><span class="sub">${x.anzahl} offen · ${m2(x.summe)}${x.ueberfaellig ? ` · davon überfällig <b class="down">${m2(x.ueberfaellig)}</b>` : ''}</span></div>
+      <div class="tbl-wrap"><table class="shop"><thead><tr><th>Nr.</th><th>Kontakt</th><th>Datum</th><th>Fällig</th><th class="r">Offen</th></tr></thead><tbody>
+      ${x.liste.map(v => `<tr class="${v.faellig && v.faellig < today ? 'late' : ''}"><td>${esc(v.nr)}</td><td>${esc(v.kontakt)}</td><td>${v.datum.split('-').reverse().join('.')}</td><td class="${v.faellig && v.faellig < today ? 'down' : ''}">${v.faellig ? v.faellig.split('-').reverse().join('.') : ''}</td><td class="r num">${m2(v.offen)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nichts offen.</td></tr>'}
+      </tbody></table></div>${x.anzahl > x.liste.length ? `<p class="hint">Es werden die ${x.liste.length} ältesten angezeigt.</p>` : ''}</section>`;
+    const months = L.einnahmen.map((e, i) => i).filter(i => i <= cm);
+    host.innerHTML = title + `<section class="tiles">${tile('Offene Forderungen', L.forderungen.summe, `${L.forderungen.anzahl} Rechnungen${L.forderungen.ueberfaellig ? ' · ' + eur(L.forderungen.ueberfaellig) + ' überfällig' : ''}`, L.forderungen.ueberfaellig ? 'neg' : '')}
+        ${tile('Offene Lieferantenrechnungen', L.verbindlichkeiten.summe, `${L.verbindlichkeiten.anzahl} Belege${L.verbindlichkeiten.ueberfaellig ? ' · ' + eur(L.verbindlichkeiten.ueberfaellig) + ' überfällig' : ''}`)}
+        ${tile('Einnahmen ' + L.year, sumTo(L.einnahmen), 'Ausgangsrechnungen bis heute')}
+        ${tile('Ausgaben ' + L.year, sumTo(L.ausgaben), 'Eingangsrechnungen bis heute')}</section>
+      ${L.entwuerfe ? `<p class="sub">${L.entwuerfe} Rechnungsentwürfe warten in Lexoffice auf den Abschluss.</p>` : ''}
+      <section class="panel"><div class="panel-head"><h2>Je Monat laut Lexoffice</h2></div><div class="tbl-wrap"><table class="shop"><thead><tr><th>Monat</th><th class="r">Einnahmen</th><th class="r">Ausgaben</th><th class="r">Differenz</th></tr></thead><tbody>
+        ${months.map(i => `<tr><td>${ML[i]}</td><td class="r num">${m2(L.einnahmen[i])}</td><td class="r num">${m2(L.ausgaben[i])}</td><td class="r num ${L.einnahmen[i] - L.ausgaben[i] < 0 ? 'down' : 'up'}">${m2(L.einnahmen[i] - L.ausgaben[i])}</td></tr>`).join('')}
+      </tbody></table></div><p class="hint">Nur Belege, die in Lexoffice erfasst sind; Gehälter, Bankgebühren o. Ä. ohne Beleg fehlen. Deshalb weicht das von der BWA ab.</p></section>
+      ${list('Offene Ausgangsrechnungen', L.forderungen)}${list('Offene Lieferantenrechnungen', L.verbindlichkeiten)}`;
   }
 
   function bindRefresh(host, tab, company) {
