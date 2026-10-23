@@ -34,7 +34,9 @@ const Live = (() => {
     const parts = NEEDS[tab].filter(p => refresh || !fresh(p));
     if (!parts.length) return data;
     if (loading) await loading.catch(() => {});
-    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 45000);
+    // Die Trainingsabrechnung rechnet beim Aktualisieren alle Stundenlisten neu - das dauert bis zu einigen Minuten
+    const slow = refresh && parts.some(p => p === 'abrechnung');
+    const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), slow ? 330000 : 45000);
     loading = (async () => {
       let res;
       try {
@@ -96,7 +98,7 @@ const Live = (() => {
     if (tab === 'buchhaltung') drawBuchhaltung(company, host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
-      rb.disabled = true; rb.textContent = 'Lädt …';
+      rb.disabled = true; rb.textContent = tab === 'abrechnung' ? 'Rechnet neu … (1–3 Min.)' : 'Lädt …';
       try { await load(tab, true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); rb.disabled = false; rb.textContent = 'Aktualisieren'; }
     });
   }
@@ -466,7 +468,7 @@ const Live = (() => {
   function bindRefresh(host, tab, company) {
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
-      rb.disabled = true; rb.textContent = 'Lädt …';
+      rb.disabled = true; rb.textContent = tab === 'abrechnung' ? 'Rechnet neu … (1–3 Min.)' : 'Lädt …';
       try { await load(tab, true); draw(tab, company, host); } catch (e) { toast(e.message || 'Fehler'); }
     });
   }
