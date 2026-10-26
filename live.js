@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'], buchhaltung: ['lexoffice'], hallenumsatz: ['hallenumsatz'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle', 'hallenumsatz'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'], buchhaltung: ['lexoffice'], hallenumsatz: ['hallenumsatz'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -91,12 +91,11 @@ const Live = (() => {
     }
     if (tab === 'umsatz') drawUmsatz(company, host);
     if (tab === 'trainer') drawTrainer(company, host, 'Trainerauslastung');
-    if (tab === 'halle') drawHalle(host);
+    if (tab === 'halle') drawHalleTab(host);
     if (tab === 'rendite') drawRendite(host);
     if (tab === 'ziele') drawZiele(host);
     if (tab === 'abrechnung') drawAbrechnung(host);
     if (tab === 'buchhaltung') drawBuchhaltung(company, host);
-    if (tab === 'hallenumsatz') drawHallenUmsatz(host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = tab === 'abrechnung' ? 'Rechnet neu … (1–3 Min.)' : 'Lädt …';
@@ -443,6 +442,16 @@ const Live = (() => {
     });
   }
 
+  // ---------- Reiter Halle: Umschaltung Auslastung / Umsatz ----------
+  function drawHalleTab(host) {
+    const U = data.hallenumsatz, canU = U && !U.error && U.months; // Mitarbeiter bekommen keinen Umsatz
+    const view = canU && ui.hu.view === 'umsatz' ? 'umsatz' : 'auslastung';
+    if (view === 'umsatz') drawHallenUmsatz(host); else drawHalle(host);
+    if (!canU) return;
+    host.insertAdjacentHTML('afterbegin', `<div class="seg-switch shop-nav" role="group" aria-label="Ansicht">${[['auslastung', 'Auslastung'], ['umsatz', 'Umsatz']].map(([k, t]) => `<button type="button" data-hv="${k}" aria-pressed="${k === view}">${t}</button>`).join('')}</div>`);
+    host.querySelectorAll('[data-hv]').forEach(b => b.addEventListener('click', () => { ui.hu.view = b.dataset.hv; drawHalleTab(host); bindRefresh(host, 'halle'); }));
+  }
+
   // ---------- Hallen-Umsatz (Training ohne Abo + externe Einzelbuchungen) ----------
   function drawHallenUmsatz(host) {
     const H = data.hallenumsatz, st = ui.hu;
@@ -463,7 +472,7 @@ const Live = (() => {
         ${mo.einzel.map(x => `<tr><td>${x.d.split('-').reverse().join('.')}</td><td>${platz(x.platz)}</td><td>${x.von}–${x.bis}</td><td class="r num">${de1.format(x.std).replace(/,0$/, '')}</td><td class="r num">${m2(x.betrag)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Keine Einzelbuchungen.</td></tr>'}
         </tbody></table></div><p class="hint">Preise aus dem Blatt „Hallenpreise“ (eBuSy-Stundenpreise). Zukünftige Buchungen im laufenden Monat sind schon enthalten; Stornos verschwinden beim nächsten Abgleich.</p></section>`;
     const s = $('hu-month'); s.value = String(sel);
-    s.addEventListener('change', e => { st.month = +e.target.value; drawHallenUmsatz(host); bindRefresh(host, 'hallenumsatz'); });
+    s.addEventListener('change', e => { st.month = +e.target.value; drawHalleTab(host); bindRefresh(host, 'halle'); });
   }
 
   // ---------- Buchhaltung (Lexoffice, nur lesend) ----------
