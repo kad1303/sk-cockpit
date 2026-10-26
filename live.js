@@ -9,7 +9,7 @@
 const Live = (() => {
   const URL_ = (window.SK_CONFIG || {}).live || '';
   let data = null, loadedAt = 0, loading = null;
-  const ui = { umsatz: {}, trainer: {}, rendite: {}, ziele: {}, abr: {} };
+  const ui = { umsatz: {}, trainer: {}, rendite: {}, ziele: {}, abr: {}, hu: {} };
   const $ = id => document.getElementById(id);
   const svgNS = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs, parent) => {
@@ -26,7 +26,7 @@ const Live = (() => {
   function configured() { return !!URL_; }
 
   // Lädt nur die Teile, die der Reiter braucht; bereits geladene Teile bleiben 10 Minuten gültig
-  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'], buchhaltung: ['lexoffice'] };
+  const NEEDS = { umsatz: ['umsatz'], trainer: ['trainer'], halle: ['halle'], rendite: ['rendite'], ziele: ['ziele'], abrechnung: ['abrechnung'], buchhaltung: ['lexoffice'], hallenumsatz: ['hallenumsatz'] };
   const got = {};
   async function load(tab, refresh) {
     if (!configured()) throw new Error('Die Live-Daten sind noch nicht verbunden.');
@@ -96,6 +96,7 @@ const Live = (() => {
     if (tab === 'ziele') drawZiele(host);
     if (tab === 'abrechnung') drawAbrechnung(host);
     if (tab === 'buchhaltung') drawBuchhaltung(company, host);
+    if (tab === 'hallenumsatz') drawHallenUmsatz(host);
     const rb = $('live-refresh');
     if (rb) rb.addEventListener('click', async () => {
       rb.disabled = true; rb.textContent = tab === 'abrechnung' ? 'Rechnet neu … (1–3 Min.)' : 'Lädt …';
@@ -440,6 +441,29 @@ const Live = (() => {
       a.download = `Trainingsabrechnung_${views.find(v => v[0] === view)[1].replace(/\W+/g, '-')}_${ML[mo.m]}_${mo.y}.csv`;
       document.body.appendChild(a); a.click(); a.remove();
     });
+  }
+
+  // ---------- Hallen-Umsatz (Training ohne Abo + externe Einzelbuchungen) ----------
+  function drawHallenUmsatz(host) {
+    const H = data.hallenumsatz, st = ui.hu;
+    const last = H.months.length - 1, sel = st.month === undefined ? last : st.month, mo = H.months[sel];
+    const m2 = v => de2.format(v) + ' €';
+    const platz = c => ({ '3009': 'Platz 1', '3010': 'Platz 2', '3011': 'Platz 3' })[c] || 'Platz ' + c;
+    const opts = H.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[H.months[i].m]} ${H.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
+    const std = mo.einzel.reduce((s, x) => s + x.std, 0);
+    const tile = (l, v, sub) => `<article class="tile"><div class="label">${l}</div><div class="value num">${eur(v)}</div><div class="what">${sub}</div></article>`;
+    host.innerHTML = head('Hallen-Umsatz', 'Was über die Halle reinkommt: Hallenkosten aus dem Training von Kunden ohne Hallenabo (wie in der Trainingsabrechnung) und externe Einzelbuchungen aus eBuSy (gelbe Buchungen, bewertet mit den eBuSy-Stundenpreisen). Turnierfuxx-Blöcke zählen nicht. Hallenabos sind nicht enthalten.', `<select id="hu-month" aria-label="Monat">${opts}</select>`) +
+      `<section class="tiles tiles-3">${tile('Gesamt', mo.sumTraining + mo.sumEinzel, `${ML[mo.m]} ${mo.y}`)}${tile('Training ohne Abo', mo.sumTraining, `${mo.training.length} Kunden`)}${tile('Externe Einzelbuchungen', mo.sumEinzel, `${mo.einzel.length} Buchungen · ${h1(std)}${mo.fuxx ? ` · ${mo.fuxx}× Turnierfuxx nicht gezählt` : ''}`)}</section>
+      <section class="panel"><div class="panel-head"><h2>Verlauf</h2></div><div class="tbl-wrap"><table class="shop"><thead><tr><th>Monat</th><th class="r">Training ohne Abo</th><th class="r">Einzelbuchungen</th><th class="r">Gesamt</th></tr></thead><tbody>
+        ${H.months.map(x => `<tr><td>${ML[x.m]} ${x.y}</td><td class="r num">${m2(x.sumTraining)}</td><td class="r num">${m2(x.sumEinzel)}</td><td class="r num"><b>${m2(x.sumTraining + x.sumEinzel)}</b></td></tr>`).join('')}</tbody></table></div></section>
+      <section class="panel"><div class="panel-head"><h2>Training ohne Abo</h2><span class="sub">${m2(mo.sumTraining)}</span></div>
+        <div class="tbl-wrap"><table class="shop"><tbody>${mo.training.map(x => `<tr><td>${esc(x.name)}</td><td class="r num">${m2(x.betrag)}</td></tr>`).join('') || '<tr><td class="sub">Keine Hallenkosten in diesem Monat (außerhalb der Hallensaison 01.10.–15.04. oder keine Kunden ohne Abo).</td></tr>'}</tbody></table></div></section>
+      <section class="panel"><div class="panel-head"><h2>Externe Einzelbuchungen</h2><span class="sub">${m2(mo.sumEinzel)}</span></div>
+        <div class="tbl-wrap"><table class="shop"><thead><tr><th>Datum</th><th>Platz</th><th>Zeit</th><th class="r">Std.</th><th class="r">Betrag</th></tr></thead><tbody>
+        ${mo.einzel.map(x => `<tr><td>${x.d.split('-').reverse().join('.')}</td><td>${platz(x.platz)}</td><td>${x.von}–${x.bis}</td><td class="r num">${de1.format(x.std).replace(/,0$/, '')}</td><td class="r num">${m2(x.betrag)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Keine Einzelbuchungen.</td></tr>'}
+        </tbody></table></div><p class="hint">Preise aus dem Blatt „Hallenpreise“ (eBuSy-Stundenpreise). Zukünftige Buchungen im laufenden Monat sind schon enthalten; Stornos verschwinden beim nächsten Abgleich.</p></section>`;
+    const s = $('hu-month'); s.value = String(sel);
+    s.addEventListener('change', e => { st.month = +e.target.value; drawHallenUmsatz(host); bindRefresh(host, 'hallenumsatz'); });
   }
 
   // ---------- Buchhaltung (Lexoffice, nur lesend) ----------
