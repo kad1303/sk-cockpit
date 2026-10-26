@@ -1,7 +1,7 @@
 // Service Worker: holt die App immer frisch aus dem Netz (damit Updates sofort ankommen)
 // und fällt nur ohne Netz auf die gespeicherte Kopie zurück.
 // Zahlen werden NICHT gespeichert – Anfragen an Supabase laufen am Service Worker vorbei.
-const CACHE = 'skcockpit-v31';
+const CACHE = 'skcockpit-v32';
 const ASSETS = [
   './', './index.html', './styles.css', './config.js', './auth.js', './charts.js', './bwa.js', './live.js', './shop-parse.js', './shop.js', './app.js',
   './manifest.webmanifest', './icons/icon-180.png', './icons/icon-192.png', './icons/icon-512.png', './icons/logo-tennis.png', './icons/logo-fitness.png',

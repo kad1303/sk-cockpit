@@ -461,7 +461,24 @@ const Live = (() => {
     const opts = H.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[H.months[i].m]} ${H.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
     const std = mo.einzel.reduce((s, x) => s + x.std, 0);
     const tile = (l, v, sub) => `<article class="tile"><div class="label">${l}</div><div class="value num">${eur(v)}</div><div class="what">${sub}</div></article>`;
-    host.innerHTML = head('Hallen-Umsatz', 'Was über die Halle reinkommt: Hallenkosten aus dem Training von Kunden ohne Hallenabo (wie in der Trainingsabrechnung) und externe Einzelbuchungen aus eBuSy (gelbe Buchungen, bewertet mit den eBuSy-Stundenpreisen). Turnierfuxx-Blöcke zählen nicht. Hallenabos sind nicht enthalten.', `<select id="hu-month" aria-label="Monat">${opts}</select>`) +
+    // Wochenansicht
+    const wv = st.per === 'woche' && H.weeks;
+    const perSwitch = H.weeks ? `<div class="seg-switch" role="group" aria-label="Zeitraum">${[['monat', 'Monate'], ['woche', 'Wochen']].map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${(st.per || 'monat') === k}">${t}</button>`).join('')}</div>` : '';
+    if (wv) {
+      const kw = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + 3); const y0 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - y0) / 864e5 - 3 + ((y0.getDay() + 6) % 7)) / 7); };
+      const fmt = iso => iso.split('-').reverse().slice(0, 2).join('.') + '.';
+      const plus6 = iso => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + 6); return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.`; };
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const weeks = H.weeks.slice().reverse();
+      const maxV = Math.max(1, ...weeks.map(w => w.training + w.einzel));
+      host.innerHTML = head('Hallen-Umsatz', 'Je Woche (Montag bis Sonntag): Hallenkosten aus dem Training von Kunden ohne Abo und externe Einzelbuchungen aus eBuSy (ohne Turnierfuxx). Schon gebuchte Termine der laufenden und kommenden Wochen sind enthalten.', perSwitch) +
+        `<section class="panel"><div class="tbl-wrap"><table class="shop"><thead><tr><th>Woche</th><th class="r">Training ohne Abo</th><th class="r">Einzelbuchungen</th><th class="r">Gesamt</th><th></th></tr></thead><tbody>
+        ${weeks.map(w => { const fut = w.von > todayIso; const tot = w.training + w.einzel;
+          return `<tr class="${fut ? 'muted' : ''}"><td><b>KW ${kw(w.von)}</b><div class="sub">${fmt(w.von)}–${plus6(w.von)}${fut ? ' · geplant' : ''}</div></td><td class="r num">${m2(w.training)}<div class="sub">${w.nTraining} Termine</div></td><td class="r num">${m2(w.einzel)}<div class="sub">${w.nEinzel} Buchungen</div></td><td class="r num"><b>${m2(tot)}</b></td><td style="width:30%; min-width:80px"><span class="tr-bar" style="display:block"><span class="tr-ist" style="width:${tot / maxV * 100}%"></span></span></td></tr>`; }).join('') || '<tr><td colspan="5" class="sub">Noch keine Daten.</td></tr>'}
+        </tbody></table></div><p class="hint">Hallenkosten aus dem Training fallen nur in der Hallensaison (01.10.–15.04.) an.</p></section>`;
+      host.querySelectorAll('[data-per]').forEach(b => b.addEventListener('click', () => { st.per = b.dataset.per; drawHalleTab(host); bindRefresh(host, 'halle'); }));
+      return;
+    }    host.innerHTML = head('Hallen-Umsatz', 'Was über die Halle reinkommt: Hallenkosten aus dem Training von Kunden ohne Hallenabo (wie in der Trainingsabrechnung) und externe Einzelbuchungen aus eBuSy (gelbe Buchungen, bewertet mit den eBuSy-Stundenpreisen). Turnierfuxx-Blöcke zählen nicht. Hallenabos sind nicht enthalten.', perSwitch + `<select id="hu-month" aria-label="Monat">${opts}</select>`) +
       `<section class="tiles tiles-3">${tile('Gesamt', mo.sumTraining + mo.sumEinzel, `${ML[mo.m]} ${mo.y}`)}${tile('Training ohne Abo', mo.sumTraining, `${mo.training.length} Kunden`)}${tile('Externe Einzelbuchungen', mo.sumEinzel, `${mo.einzel.length} Buchungen · ${h1(std)}${mo.fuxx ? ` · ${mo.fuxx}× Turnierfuxx nicht gezählt` : ''}`)}</section>
       <section class="panel"><div class="panel-head"><h2>Verlauf</h2></div><div class="tbl-wrap"><table class="shop"><thead><tr><th>Monat</th><th class="r">Training ohne Abo</th><th class="r">Einzelbuchungen</th><th class="r">Gesamt</th></tr></thead><tbody>
         ${H.months.map(x => `<tr><td>${ML[x.m]} ${x.y}</td><td class="r num">${m2(x.sumTraining)}</td><td class="r num">${m2(x.sumEinzel)}</td><td class="r num"><b>${m2(x.sumTraining + x.sumEinzel)}</b></td></tr>`).join('')}</tbody></table></div></section>
@@ -471,6 +488,7 @@ const Live = (() => {
         <div class="tbl-wrap"><table class="shop"><thead><tr><th>Datum</th><th>Platz</th><th>Zeit</th><th class="r">Std.</th><th class="r">Betrag</th></tr></thead><tbody>
         ${mo.einzel.map(x => `<tr><td>${x.d.split('-').reverse().join('.')}</td><td>${platz(x.platz)}</td><td>${x.von}–${x.bis}</td><td class="r num">${de1.format(x.std).replace(/,0$/, '')}</td><td class="r num">${m2(x.betrag)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Keine Einzelbuchungen.</td></tr>'}
         </tbody></table></div><p class="hint">Preise aus dem Blatt „Hallenpreise“ (eBuSy-Stundenpreise). Zukünftige Buchungen im laufenden Monat sind schon enthalten; Stornos verschwinden beim nächsten Abgleich.</p></section>`;
+    host.querySelectorAll('[data-per]').forEach(b => b.addEventListener('click', () => { st.per = b.dataset.per; drawHalleTab(host); bindRefresh(host, 'halle'); }));
     const s = $('hu-month'); s.value = String(sel);
     s.addEventListener('change', e => { st.month = +e.target.value; drawHalleTab(host); bindRefresh(host, 'halle'); });
   }
