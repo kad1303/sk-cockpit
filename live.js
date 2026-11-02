@@ -381,6 +381,13 @@ const Live = (() => {
     const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['vertrag', 'Vertrag', 'Vertrag Monatsbeitrag'], ['zusatz', 'Zusatz', 'Zusatzkosten']];
     const span = used.length + 4 + extra.length;
     const hinw = mo.hinweise.filter(h => /^Fitness:/.test(h) === fitMode);
+    const ab = (mo.abgleich || []).filter(x => !!x.fit === fitMode && (!q || x.name.toLowerCase().includes(q)));
+    const abRow = x => `<tr><td>${x.d.split('-').reverse().slice(0, 2).join('.')}.</td><td>${esc(x.name)}</td><td class="sub">${esc(x.tr || '')}${x.zeit ? ' · ' + esc(x.zeit) : ''}</td></tr>`;
+    const abS = ab.filter(x => x.art === 'stundenliste'), abW = ab.filter(x => x.art === 'wochenplan');
+    const abHtml = mo.abgleich ? `<section class="panel"><div class="panel-head"><h2>Abgleich mit dem Wochenplan</h2><span class="sub">${ab.length ? ab.length + ' Abweichungen' : 'alles stimmt'}</span></div>
+      ${abS.length ? `<h3>Nur in der Stundenliste – im Wochenplan an dem Tag nicht gefunden (wird berechnet)</h3><div class="tbl-wrap"><table class="shop"><tbody>${abS.map(abRow).join('')}</tbody></table></div>` : ''}
+      ${abW.length ? `<h3>Nur im Wochenplan – in der Stundenliste an dem Tag nicht eingetragen (wird nicht berechnet)</h3><div class="tbl-wrap"><table class="shop"><tbody>${abW.map(abRow).join('')}</tbody></table></div>` : ''}
+      <p class="hint">Verglichen werden Kunde und Tag (nicht die Uhrzeit), nur vergangene Tage. Vertragsspieler, Club-Gruppen und Abos sind ausgenommen.</p></section>` : '';
     const firstPriv = rows.findIndex(r => !r.vertrag);
     const ym = mo.y + '-' + String(mo.m + 1).padStart(2, '0');
     const ck = s => s.toLowerCase().replace(/\(.*?\)/g, ' ').replace(/\./g, ' ').replace(/ß/g, 'ss').replace(/\s+/g, ' ').trim();
@@ -401,6 +408,7 @@ const Live = (() => {
         <tbody>${body || `<tr><td colspan="${span}" class="sub">Keine Einträge.</td></tr>`}</tbody>
         <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}${'<td></td>'.repeat(extra.length + 2)}</tr>
           <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}${extra.map(([k]) => `<td class="r num">${m2(rows.reduce((s, r) => s + (r[k] || 0), 0))}</td>`).join('')}<td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
+      ${abHtml}
       ${hinw.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${hinw.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
       <p class="hint">${fitMode ? 'Fitness: jede Stunde 30 € je Person (2-4 60), Paavo allein 90 € (PT 60). Vornamen aus Alex’ Liste werden über die Fitness-Kundenliste zu vollen Namen ergänzt. Remote-Coaching aus dem Blatt „Fitness-Remote“. Vertragsspieler laufen über die Akademie und werden hier nicht berechnet.' : 'Hallenkosten: Stundenpreis laut eBuSy zur Trainingszeit × Dauer ÷ Anzahl Spieler, nur für Kunden ohne Hallenabo (Blatt „Hallenkosten-Kunden“). Vertrags- und Turnierkosten sowie individuelle Absprachen fehlen. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).'}</p>`;
     const redraw = () => { drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); };
