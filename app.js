@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '32';
+const APP_VERSION = '33';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -292,7 +292,8 @@ function openCompany(id, year) {
     Fin.renderPeriod(state.period);
   });
   let tabs = isStaff() ? TABS_STAFF : (TABS[id] || TABS.tennis);
-  if (id === 'tennis' && state.me && state.me.role === 'admin') tabs = tabs.concat([['shop', 'Shop'], ['abrechnung', 'Trainingsabrechnung']]); // Warenwirtschaft nur für Admin
+  if (id === 'tennis' && state.me && state.me.role === 'admin') tabs = tabs.concat([['shop', 'Shop'], ['abrechnung', 'Trainingsabrechnung']]);
+  if (id === 'fitness' && state.me && state.me.role === 'admin') tabs = tabs.concat([['abrechnung', 'Trainingsabrechnung']]); // Warenwirtschaft nur für Admin
   if (isStaff()) $('title').textContent = c.short; // keine BWA-Daten für Mitarbeiter
   else renderDash();
   $('tabs').innerHTML = tabs.map(([k, l]) => `<button type="button" data-tab="${k}">${l}</button>`).join('');
