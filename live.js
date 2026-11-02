@@ -395,7 +395,15 @@ const Live = (() => {
     const lexKey = (fitMode ? 'F ' : '') + ym;
     const lexId = r => A.lex[lexKey + '|' + ck(r.name)];
     const isCur = sel === last;
-    const lexCell = r => `<td class="r">${lexId(r) ? '<span class="chip-ok">Entwurf ✓</span>' : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
+    // Status aus Lexoffice: Entwurf grau, abgeschlossen/verschickt gruener Haken, bezahlt mit Zusatz
+    const lexSt = r => (A.lexStatus || {})[lexId(r)] || 'draft';
+    const lexChip = r => {
+      const st = lexSt(r);
+      if (st === 'draft') return '<span class="chip-draft">Entwurf</span>';
+      if (st === 'voided') return '<span class="chip-draft">storniert</span>';
+      return /paid/.test(st) ? '<span class="chip-ok" title="bezahlt">✓ bezahlt</span>' : '<span class="chip-ok" title="abgeschlossen / verschickt">✓</span>';
+    };
+    const lexCell = r => `<td class="r">${lexId(r) ? lexChip(r) : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
     const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
