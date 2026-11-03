@@ -374,3 +374,5 @@ table.abr .abr-sep td { font-weight: 700; font-size: 0.8rem; text-transform: upp
 .chip-ok { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--good); background: var(--good-wash, rgba(46,160,90,0.12)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .chip-draft { display: inline-block; font-size: 0.75rem; font-weight: 600; color: var(--muted); background: rgba(127,127,127,0.12); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
 .ab-warn { color: var(--warn); font-weight: 700; }
+/* Trainingsabrechnung: volle Fensterbreite nutzen, damit alle Spalten ohne Schieben sichtbar sind */
+.wrap:has(table.abr) { max-width: none; padding-left: 24px; padding-right: 24px; }
