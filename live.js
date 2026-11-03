@@ -395,6 +395,12 @@ const Live = (() => {
     const lexKey = (fitMode ? 'F ' : '') + ym;
     const lexId = r => A.lex[lexKey + '|' + ck(r.name)];
     const isCur = sel === last;
+    // Abweichungen zum Wochenplan direkt beim Kunden: ⚠ in der Zeile, betroffene Tage in den Terminen
+    const abAll = (mo.abgleich || []).filter(x => !!x.fit === fitMode);
+    const abOf = r => abAll.filter(x => (x.k || ck(x.name)) === ck(r.name));
+    const abTag = x => x.d.split('-').reverse().slice(0, 2).join('.') + '.';
+    const abText = x => x.art === 'wochenplan' ? `${abTag(x)} im Wochenplan, nicht in der Stundenliste (nicht berechnet)` : `${abTag(x)} in der Stundenliste (${x.tr || ''}), nicht im Wochenplan`;
+    const abMark = r => { const a = abOf(r); return a.length ? ` <span class="ab-warn" title="${esc(a.map(abText).join('\n'))}">⚠</span>` : ''; };
     // Status aus Lexoffice: Entwurf grau, Rechnung raus (abgeschlossen) gruener Haken
     const lexSt = r => (A.lexStatus || {})[lexId(r)] || 'draft';
     const lexChip = r => {
@@ -404,9 +410,9 @@ const Live = (() => {
       return '<span class="chip-ok" title="Rechnung raus">✓</span>';
     };
     const lexCell = r => `<td class="r">${lexId(r) ? lexChip(r) : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
-    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
+    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
-        <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}</td></tr>`).join('');
+        <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
     host.innerHTML = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group" ${fitMode ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
