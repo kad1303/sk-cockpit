@@ -416,7 +416,9 @@ const Live = (() => {
       return '<span class="chip-ok" title="Rechnung raus">✓</span>';
     };
     const unklar = r => (r.pruefen || []).length > 0;
-    const lexCell = r => `<td class="r">${lexId(r) ? lexChip(r) : isCur ? '' : unklar(r) ? `<button class="btn ghost sm warn-btn" data-lex="${esc(r.name)}" data-check="1" title="${esc(r.pruefen.join('\n'))}">⚠ prüfen</button>` : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
+    const busy = A.lexBusy = A.lexBusy || {};
+    const doppelt = r => (A.lexDoppelt || {})[lexKey + '|' + ck(r.name)];
+    const lexCell = r => `<td class="r lex-col">${busy[r.name] ? '<span class="chip-draft">Lege an …</span>' : lexId(r) ? lexChip(r) + (doppelt(r) ? ` <span class="ab-warn" title="In Lexoffice gibt es ${doppelt(r)} Entwürfe für diesen Kunden und Monat – bitte einen löschen">⚠ ${doppelt(r)}×</span>` : '') : isCur ? '' : unklar(r) ? `<button class="btn ghost sm warn-btn" data-lex="${esc(r.name)}" data-check="1" title="${esc(r.pruefen.join('\n'))}">⚠ prüfen</button>` : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
     const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
@@ -424,7 +426,7 @@ const Live = (() => {
     host.innerHTML = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group" ${fitMode ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
         <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button>${!isCur && all.some(r => !lexId(r) && r.summe > 0) ? `<button class="btn" type="button" id="a-lexall">Alle als Lexoffice-Entwurf (${all.filter(r => !lexId(r) && r.summe > 0).length})</button>` : ''}</div></div>
-        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}${extra.map(([, t]) => `<th class="r">${t}</th>`).join('')}<th class="r">Summe</th><th class="r">Lexoffice</th></tr>
+        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}${extra.map(([, t]) => `<th class="r">${t}</th>`).join('')}<th class="r">Summe</th><th class="r lex-col">Lexoffice</th></tr>
           <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}${'<th></th>'.repeat(extra.length + 2)}</tr></thead>
         <tbody>${body || `<tr><td colspan="${span}" class="sub">Keine Einträge.</td></tr>`}</tbody>
         <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}${'<td></td>'.repeat(extra.length + 2)}</tr>
@@ -443,6 +445,7 @@ const Live = (() => {
     const lexSend = async (names, btn, bestaetigt) => {
       if (!names.length) return;
       const label = btn.textContent; btn.disabled = true;
+      names.forEach(n => { busy[n] = true; });
       let ok = 0, noContact = 0; const errs = [], alte = [];
       try {
         for (let i = 0; i < names.length; i += 12) {
@@ -456,6 +459,7 @@ const Live = (() => {
         if (errs.length) alertBox(errs);
         if (alte.length) alertBox(alte, 'Training an bestehenden Entwurf angehängt – bitte alten Entwurf löschen');
       } catch (e) { toast(e.message || String(e)); }
+      names.forEach(n => { delete busy[n]; });
       btn.disabled = false; btn.textContent = label; redraw();
     };
     const alertBox = (errs, titel) => { const p = document.createElement('section'); p.className = 'panel'; p.innerHTML = `<h2>${esc(titel || 'Nicht angelegt')}</h2><ul class="hint-list">${errs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; host.appendChild(p); };

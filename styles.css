@@ -354,7 +354,12 @@ input[type=month] { font: inherit; color: var(--ink); background: var(--page); b
 .pos-row .num-in { width: 100%; }
 
 /* Trainingsabrechnung */
-table.abr th, table.abr td { white-space: nowrap; }
+table.abr th, table.abr td { white-space: nowrap; padding-left: 6px; padding-right: 6px; }
+table.abr { font-size: 0.85rem; }
+table.abr thead th { white-space: normal; vertical-align: bottom; }
+/* Lexoffice-Spalte bleibt rechts sichtbar, auch wenn die Tabelle breiter als der Bildschirm ist */
+table.abr .lex-col { position: sticky; right: 0; background: var(--card); box-shadow: -6px 0 6px -6px rgba(0,0,0,0.25); z-index: 1; }
+table.abr .abr-row:hover td.lex-col { background: var(--track); }
 table.abr tr.price th { font-weight: 400; color: var(--muted); font-size: 0.75rem; padding-top: 0; }
 table.abr .abr-row { cursor: pointer; }
 table.abr .abr-row:hover td { background: var(--track); }
