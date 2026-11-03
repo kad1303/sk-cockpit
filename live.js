@@ -371,7 +371,16 @@ const Live = (() => {
     const m2 = v => de2.format(v) + ' €';
     const unit = v => v ? de2.format(v).replace(/,00$/, '').replace(/(,\d)0$/, '$1') : '';
     const split = n => { const w = n.trim().split(/\s+/); return w.length > 1 ? [w.slice(-1)[0], w.slice(0, -1).join(' ')] : [n, '']; };
-    const all = mo.rows.filter(r => r.tab === view).sort((a, b) => (b.vertrag > 0) - (a.vertrag > 0) || split(a.name)[0].localeCompare(split(b.name)[0], 'de') || a.name.localeCompare(b.name, 'de'));
+    // Club laeuft ueber Serienrechnungen in Lexoffice: eigene Tabelle; Pro/Asi zeigen nur Privattraining (ohne Club)
+    const isClubP = p => /^club/i.test(p);
+    const nur = (r, club) => { const u = {}; Object.keys(r.units).forEach(p => { if (r.units[p] && isClubP(p) === club) u[p] = r.units[p]; }); return u; };
+    const privOf = r => { const u = nur(r, false); return Object.assign({}, r, { units: u, summe: Math.round((r.summe - (r.club || 0)) * 100) / 100,
+      ptab: r.tab === 'fitness' ? 'fitness' : r.tab === 'pro' || Object.keys(u).some(p => /Pro Coach/.test(p)) ? 'pro' : 'asi' }); };
+    const clubOf = r => Object.assign({}, r, { units: nur(r, true), summe: r.club || 0, halle: 0, vertrag: 0, zusatz: 0, pruefen: [] });
+    const sortRows = (a, b) => (b.vertrag > 0) - (a.vertrag > 0) || split(a.name)[0].localeCompare(split(b.name)[0], 'de') || a.name.localeCompare(b.name, 'de');
+    const all = (fitMode ? mo.rows.filter(r => r.tab === 'fitness') : mo.rows.filter(r => r.tab !== 'fitness').map(privOf).filter(r => r.ptab === view && (r.summe > 0 || r.vertrag > 0))).sort(sortRows);
+    const clubAll = fitMode || view !== 'asi' ? [] : mo.rows.filter(r => r.tab !== 'fitness' && r.club > 0).map(clubOf).sort(sortRows);
+    const clubRows = clubAll.filter(r => !q || r.name.toLowerCase().includes(q));
     const rows = all.filter(r => !q || r.name.toLowerCase().includes(q));
     const used = PROD_ORDER.filter(p => all.some(r => r.units[p])).concat([...new Set(all.flatMap(r => Object.keys(r.units)))].filter(p => PROD_ORDER.indexOf(p) < 0));
     const opts = A.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[A.months[i].m]} ${A.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
@@ -423,8 +432,20 @@ const Live = (() => {
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
+    const clubUsed = ['Club 60', 'Club 90'].filter(p => clubAll.some(r => r.units[p]));
+    const clubSpan = clubUsed.length + 3;
+    const clubSum = p => clubRows.reduce((s, r) => s + (r.units[p] || 0), 0);
+    const clubHtml = clubAll.length ? `<section class="panel"><div class="panel-head"><h2>Club – ${nMon}</h2><span class="sub">${clubRows.length} Spieler · läuft über die Serienrechnungen in Lexoffice, hier nur zur Kontrolle</span></div>
+        <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${clubUsed.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}<th class="r">Summe</th></tr>
+          <tr class="price"><th>Preis je Gruppe/Woche</th><th></th>${clubUsed.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}<th></th></tr></thead>
+        <tbody>${clubRows.map((r, i) => `<tr class="abr-row" data-i="c${i}"><td><b>${esc(split(r.name)[0])}</b></td><td>${esc(split(r.name)[1])}</td>${clubUsed.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td></tr>
+          <tr class="abr-det" data-d="c${i}" hidden><td colspan="${clubSpan}">${r.details.filter(d => d[4] === 'Club').map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3]} Pers.`).join('<br>') || 'laut Wochenplan'}</td></tr>`).join('') || `<tr><td colspan="${clubSpan}" class="sub">Keine Einträge.</td></tr>`}</tbody>
+        <tfoot><tr class="sum"><td>Gruppen je Woche</td><td></td>${clubUsed.map(p => `<td class="r num">${unit(clubSum(p))}</td>`).join('')}<td></td></tr>
+          <tr class="sum"><td>Club gesamt</td><td></td>${clubUsed.map(p => `<td class="r num">${m2(clubSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num"><b>${m2(clubRows.reduce((s, r) => s + r.summe, 0))}</b></td></tr></tfoot></table></div>
+        <p class="hint">Monatsbeitrag je eingeplanter Gruppe pro Woche laut Wochenplan (Winterplan), im Voraus für ${nMon}. Wer zusätzlich Privattraining hat, steht unten noch einmal mit einer eigenen Rechnung.</p></section>` : '';
     host.innerHTML = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
-      `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group" ${fitMode ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
+      (clubHtml ? `<section class="panel"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div></section>` + clubHtml : '') +
+      `<section class="panel"><div class="panel-head">${clubHtml ? `<h2>Asi Coach – Privattraining ${ML[mo.m]}</h2>` : ''}<div class="seg-switch" role="group" ${fitMode || clubHtml ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
         <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button>${!isCur && all.some(r => !lexId(r) && r.summe > 0) ? `<button class="btn" type="button" id="a-lexall">Alle als Lexoffice-Entwurf (${all.filter(r => !lexId(r) && r.summe > 0).length})</button>` : ''}</div></div>
         <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}${extra.map(([, t]) => `<th class="r">${t}</th>`).join('')}<th class="r">Summe</th><th class="r lex-col">Lexoffice</th></tr>
           <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}${'<th></th>'.repeat(extra.length + 2)}</tr></thead>
