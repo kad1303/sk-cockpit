@@ -409,10 +409,11 @@ const Live = (() => {
       if (st === 'voided') return '<span class="chip-draft">storniert</span>';
       return '<span class="chip-ok" title="Rechnung raus">✓</span>';
     };
-    const lexCell = r => `<td class="r">${lexId(r) ? lexChip(r) : isCur ? '' : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
+    const unklar = r => (r.pruefen || []).length > 0;
+    const lexCell = r => `<td class="r">${lexId(r) ? lexChip(r) : isCur ? '' : unklar(r) ? `<button class="btn ghost sm warn-btn" data-lex="${esc(r.name)}" data-check="1" title="${esc(r.pruefen.join('\n'))}">⚠ prüfen</button>` : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
     const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
-        <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
+        <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
     host.innerHTML = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
       `<section class="panel"><div class="panel-head"><div class="seg-switch" role="group" ${fitMode ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
@@ -432,14 +433,14 @@ const Live = (() => {
     $('a-q').addEventListener('input', e => { st.q = e.target.value; const p = e.target.selectionStart; redraw(); const i = $('a-q'); i.focus(); i.setSelectionRange(p, p); });
     host.querySelectorAll('.abr-row').forEach(tr => tr.addEventListener('click', () => { const d = host.querySelector(`[data-d="${tr.dataset.i}"]`); d.hidden = !d.hidden; }));
     // Entwürfe in Lexoffice anlegen (je Aufruf max. 12 Kunden, damit Google nicht abbricht)
-    const lexSend = async (names, btn) => {
+    const lexSend = async (names, btn, bestaetigt) => {
       if (!names.length) return;
       const label = btn.textContent; btn.disabled = true;
       let ok = 0, noContact = 0; const errs = [];
       try {
         for (let i = 0; i < names.length; i += 12) {
           btn.textContent = `Lege an … ${Math.min(i + 12, names.length)}/${names.length}`;
-          const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'lexTrainDraft', co: fitMode ? 'fitness' : 'tennis', ym, names: names.slice(i, i + 12) }) });
+          const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'lexTrainDraft', co: fitMode ? 'fitness' : 'tennis', ym, names: names.slice(i, i + 12), bestaetigt: bestaetigt || [] }) });
           const d = await res.json();
           if (!d.ok) throw new Error(d.error === 'forbidden' ? 'Nur für den Admin-Zugang.' : d.error || 'Keine Antwort');
           d.results.forEach(x => { if (x.id) { A.lex[lexKey + '|' + ck(x.name)] = x.id; if (!x.skipped) ok++; if (x.contact === false) noContact++; } else errs.push(x.name + ': ' + x.error); });
@@ -450,12 +451,19 @@ const Live = (() => {
       btn.disabled = false; btn.textContent = label; redraw();
     };
     const alertBox = errs => { const p = document.createElement('section'); p.className = 'panel'; p.innerHTML = `<h2>Nicht angelegt</h2><ul class="hint-list">${errs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; host.appendChild(p); };
-    host.querySelectorAll('[data-lex]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); lexSend([b.dataset.lex], b); }));
+    host.querySelectorAll('[data-lex]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!b.dataset.check) return lexSend([b.dataset.lex], b);
+      // Unklare Punkte zuerst bestaetigen lassen
+      const r = all.find(x => x.name === b.dataset.lex);
+      if (window.confirm(`${r.name}: bitte erst prüfen\n\n• ${r.pruefen.join('\n• ')}\n\nIst die Stundenliste so richtig? Erst dann wird der Lexoffice-Entwurf angelegt.`)) lexSend([r.name], b, [r.name]);
+    }));
     const la = $('a-lexall');
     if (la) la.addEventListener('click', () => {
-      const names = all.filter(r => !lexId(r) && r.summe > 0).map(r => r.name);
+      // Kunden mit offenen Punkten bleiben aussen vor und muessen einzeln bestaetigt werden
+      const names = all.filter(r => !lexId(r) && r.summe > 0 && !unklar(r)).map(r => r.name), skip = all.filter(r => !lexId(r) && r.summe > 0 && unklar(r)).length;
       if (la.dataset.armed) lexSend(names, la);
-      else { la.dataset.armed = '1'; la.textContent = `Wirklich ${names.length} Entwürfe für ${ML[mo.m]} anlegen?`; la.classList.add('warn-btn'); }
+      else { la.dataset.armed = '1'; la.textContent = `Wirklich ${names.length} Entwürfe für ${ML[mo.m]} anlegen?${skip ? ` (${skip} mit ⚠ einzeln prüfen)` : ''}`; la.classList.add('warn-btn'); }
     });
     $('a-csv').addEventListener('click', () => {
       const csvNum = v => v ? String(Math.round(v * 100) / 100).replace('.', ',') : '';
