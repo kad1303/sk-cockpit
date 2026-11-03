@@ -383,7 +383,9 @@ const Live = (() => {
     const clubRows = clubAll.filter(r => !q || r.name.toLowerCase().includes(q));
     const rows = all.filter(r => !q || r.name.toLowerCase().includes(q));
     const used = PROD_ORDER.filter(p => all.some(r => r.units[p])).concat([...new Set(all.flatMap(r => Object.keys(r.units)))].filter(p => PROD_ORDER.indexOf(p) < 0));
-    const opts = A.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[A.months[i].m]} ${A.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
+    // Monat = Privattraining (rueckwirkend); Club/Akademie bzw. Remote laufen fuer den Folgemonat
+    const optLabel = x => { const n = ML[(x.m + 1) % 12]; return fitMode ? `Training ${ML[x.m]} ${x.y} · Remote ${n}` : `Privat ${ML[x.m]} ${x.y} · Club & Akademie ${n}`; };
+    const opts = A.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${optLabel(A.months[i])}${i === last ? ' (bis heute)' : ''}</option>`).join('');
     const views = fitMode ? [['fitness', 'Fitness']] : [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club']];
     const short = p => p === 'Fitness' ? '2-4 60' : p === 'Fitness PT' ? 'PT 60' : p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     // Feste Spalten je Firma
