@@ -362,7 +362,7 @@ const Live = (() => {
 
   // ---------- Trainingsabrechnung (aus den Stundenlisten) ----------
   const PROD_ORDER = ['Pro Coach 60', 'Pro Coach 90', 'Pro Coach 120', 'Asi Coach 60', 'Asi Coach 90', 'Asi Coach 120', '2er Pro Coach 60', '2er Pro Coach 90', '2er Pro Coach 120',
-    '2er Asi Coach 60', '2er Asi Coach 90', '3er Pro Coach 60', '3er Pro Coach 90', '3er Pro Coach 120', '3er Asi Coach 60', 'Fitness', 'Fitness PT', 'Club 60', 'Club 90'];
+    '2er Asi Coach 60', '2er Asi Coach 90', '3er Pro Coach 60', '3er Pro Coach 90', '3er Pro Coach 120', '3er Asi Coach 60', 'Fitness', 'Fitness PT', 'Club 45', 'Club 60', 'Club 90'];
   function drawAbrechnung(host, company) {
     const A = data.abrechnung, fitMode = company === 'fitness', st = fitMode ? (ui.abrF = ui.abrF || {}) : ui.abr;
     const last = A.months.length - 1;
@@ -432,7 +432,7 @@ const Live = (() => {
         ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
-    const clubUsed = ['Club 60', 'Club 90'].filter(p => clubAll.some(r => r.units[p]));
+    const clubUsed = ['Club 45', 'Club 60', 'Club 90'].filter(p => clubAll.some(r => r.units[p]));
     const clubSpan = clubUsed.length + 3;
     const clubSum = p => clubRows.reduce((s, r) => s + (r.units[p] || 0), 0);
     const clubHtml = clubAll.length ? `<section class="panel"><div class="panel-head"><h2>Club – ${nMon}</h2><span class="sub">${clubRows.length} Spieler · läuft über die Serienrechnungen in Lexoffice, hier nur zur Kontrolle</span></div>
