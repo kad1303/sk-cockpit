@@ -443,21 +443,22 @@ const Live = (() => {
     const lexSend = async (names, btn, bestaetigt) => {
       if (!names.length) return;
       const label = btn.textContent; btn.disabled = true;
-      let ok = 0, noContact = 0; const errs = [];
+      let ok = 0, noContact = 0; const errs = [], alte = [];
       try {
         for (let i = 0; i < names.length; i += 12) {
           btn.textContent = `Lege an … ${Math.min(i + 12, names.length)}/${names.length}`;
           const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'lexTrainDraft', co: fitMode ? 'fitness' : 'tennis', ym, names: names.slice(i, i + 12), bestaetigt: bestaetigt || [] }) });
           const d = await res.json();
           if (!d.ok) throw new Error(d.error === 'forbidden' ? 'Nur für den Admin-Zugang.' : d.error || 'Keine Antwort');
-          d.results.forEach(x => { if (x.id) { A.lex[lexKey + '|' + ck(x.name)] = x.id; if (!x.skipped) ok++; if (x.contact === false) noContact++; } else errs.push(x.name + ': ' + x.error); });
+          d.results.forEach(x => { if (x.id) { A.lex[lexKey + '|' + ck(x.name)] = x.id; if (!x.skipped) ok++; if (x.contact === false) noContact++; if (x.ersetzt && !alte.some(a => a.endsWith(x.ersetzt))) alte.push(x.name + ': ' + x.ersetzt); } else errs.push(x.name + ': ' + x.error); });
         }
         toast(`${ok} Entwürfe in Lexoffice angelegt${noContact ? ` · ${noContact} ohne passenden Lexoffice-Kontakt (Adresse im Entwurf ergänzen)` : ''}`);
         if (errs.length) alertBox(errs);
+        if (alte.length) alertBox(alte, 'Training an bestehenden Entwurf angehängt – bitte alten Entwurf löschen');
       } catch (e) { toast(e.message || String(e)); }
       btn.disabled = false; btn.textContent = label; redraw();
     };
-    const alertBox = errs => { const p = document.createElement('section'); p.className = 'panel'; p.innerHTML = `<h2>Nicht angelegt</h2><ul class="hint-list">${errs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; host.appendChild(p); };
+    const alertBox = (errs, titel) => { const p = document.createElement('section'); p.className = 'panel'; p.innerHTML = `<h2>${esc(titel || 'Nicht angelegt')}</h2><ul class="hint-list">${errs.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; host.appendChild(p); };
     host.querySelectorAll('[data-lex]').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation();
       if (!b.dataset.check) return lexSend([b.dataset.lex], b);
