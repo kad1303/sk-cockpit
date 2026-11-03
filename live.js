@@ -378,7 +378,13 @@ const Live = (() => {
     const views = fitMode ? [['fitness', 'Fitness']] : [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club']];
     const short = p => p === 'Fitness' ? '2-4 60' : p === 'Fitness PT' ? 'PT 60' : p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     // Feste Spalten je Firma
-    const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['vertrag', 'Vertrag', 'Vertrag Monatsbeitrag'], ['zusatz', 'Zusatz', 'Zusatzkosten']];
+    const nMon = ML[(mo.m + 1) % 12]; // Club und Akademie werden im Voraus fuer den Folgemonat berechnet
+    const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['vertrag', `Vertrag ${nMon.slice(0, 3)}.`, `Vertrag ${nMon}`], ['zusatz', 'Zusatz', 'Zusatzkosten']];
+    const vsS = fitMode ? [] : (mo.vsStunden || []);
+    const vsHtml = vsS.length ? `<section class="panel"><div class="panel-head"><h2>Vertragsspieler – gespielte Stunden ${ML[mo.m]}</h2><span class="sub">nur zur Kontrolle, wird nicht berechnet</span></div>
+      <div class="tbl-wrap"><table class="shop"><thead><tr><th>Spieler</th><th class="r">Tennis h</th><th class="r">Fitness h</th><th class="r">Termine</th><th class="r">Vertrag</th></tr></thead>
+      <tbody>${vsS.slice().sort((a, b) => (b.tennis + b.fitness) - (a.tennis + a.fitness)).map(v => `<tr><td>${esc(v.name)}</td><td class="r num">${unit(v.tennis)}</td><td class="r num">${unit(v.fitness)}</td><td class="r num">${v.termine}</td><td class="r num">${v.vertrag ? m2(v.vertrag) : ''}</td></tr>`).join('')}</tbody></table></div>
+      <p class="hint">Alle Termine, in denen der Spieler steht – auch (VS)-Termine mit Privatkunden. Zusätzliche Stunden werden nur auf Hinweis berechnet.</p></section>` : '';
     const span = used.length + 4 + extra.length;
     const hinw = mo.hinweise.filter(h => /^Fitness:/.test(h) === fitMode);
     const ab = (mo.abgleich || []).filter(x => !!x.fit === fitMode && (!q || x.name.toLowerCase().includes(q)));
@@ -424,8 +430,9 @@ const Live = (() => {
         <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}${'<td></td>'.repeat(extra.length + 2)}</tr>
           <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}${extra.map(([k]) => `<td class="r num">${m2(rows.reduce((s, r) => s + (r[k] || 0), 0))}</td>`).join('')}<td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
       ${abHtml}
+      ${vsHtml}
       ${hinw.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${hinw.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
-      <p class="hint">${fitMode ? 'Fitness: jede Stunde 30 € je Person (2-4 60), Paavo allein 90 € (PT 60). Vornamen aus Alex’ Liste werden über die Fitness-Kundenliste zu vollen Namen ergänzt. Remote-Coaching aus dem Blatt „Fitness-Remote“. Vertragsspieler laufen über die Akademie und werden hier nicht berechnet.' : 'Hallenkosten: Stundenpreis laut eBuSy zur Trainingszeit × Dauer ÷ Anzahl Spieler, nur für Kunden ohne Hallenabo (Blatt „Hallenkosten-Kunden“). Vertrags- und Turnierkosten sowie individuelle Absprachen fehlen. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).'}</p>`;
+      <p class="hint">${fitMode ? 'Fitness: jede Stunde 30 € je Person (2-4 60), Paavo allein 90 € (PT 60). Vornamen aus Alex’ Liste werden über die Fitness-Kundenliste zu vollen Namen ergänzt. Remote-Coaching aus dem Blatt „Fitness-Remote“. Vertragsspieler laufen über die Akademie und werden hier nicht berechnet.' : `Privattraining rückwirkend für ${ML[mo.m]}, Club und Akademie im Voraus für ${nMon}. ` + 'Hallenkosten: Stundenpreis laut eBuSy zur Trainingszeit × Dauer ÷ Anzahl Spieler, nur für Kunden ohne Hallenabo (Blatt „Hallenkosten-Kunden“). Vertrags- und Turnierkosten sowie individuelle Absprachen fehlen. Gastgebühr (Notiz „Gastgebühr“) wird mit 15 € je Termin als Zusatz berechnet. Club: fester Monatsbeitrag je eingeplanter Gruppe pro Woche (z. B. 2× pro Woche = doppelter Beitrag).'}</p>`;
     const redraw = () => { drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); };
     $('a-month').value = String(sel);
     $('a-month').addEventListener('change', e => { st.month = +e.target.value; redraw(); });
