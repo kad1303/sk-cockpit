@@ -367,7 +367,7 @@ const Live = (() => {
     const A = data.abrechnung, fitMode = company === 'fitness', st = fitMode ? (ui.abrF = ui.abrF || {}) : ui.abr;
     const last = A.months.length - 1;
     const sel = st.month === undefined ? Math.max(0, last - 1) : st.month;
-    const mo = A.months[sel], view = fitMode ? 'fitness' : (st.view === 'asi' ? 'asi' : 'pro'), q = (st.q || '').toLowerCase();
+    const mo = A.months[sel], view = fitMode ? 'fitness' : (['asi', 'turnier'].includes(st.view) ? st.view : 'pro'), q = (st.q || '').toLowerCase();
     const m2 = v => de2.format(v) + ' €';
     const unit = v => v ? de2.format(v).replace(/,00$/, '').replace(/(,\d)0$/, '$1') : '';
     const split = n => { const w = n.trim().split(/\s+/); return w.length > 1 ? [w.slice(-1)[0], w.slice(0, -1).join(' ')] : [n, '']; };
@@ -386,7 +386,7 @@ const Live = (() => {
     // Monat = Privattraining (rueckwirkend); Club/Akademie bzw. Remote laufen fuer den Folgemonat
     const optLabel = x => { const n = ML[(x.m + 1) % 12]; return fitMode ? `Training ${ML[x.m]} ${x.y} · Remote ${n}` : `Privat ${ML[x.m]} ${x.y} · Club & Akademie ${n}`; };
     const opts = A.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${optLabel(A.months[i])}${i === last ? ' (bis heute)' : ''}</option>`).join('');
-    const views = fitMode ? [['fitness', 'Fitness']] : [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club']];
+    const views = fitMode ? [['fitness', 'Fitness']] : [['pro', 'Pro Coach'], ['asi', 'Asi Coach & Club'], ['turnier', 'Turnierbetreuung']];
     const short = p => p === 'Fitness' ? '2-4 60' : p === 'Fitness PT' ? 'PT 60' : p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     // Feste Spalten je Firma
     const nMon = ML[(mo.m + 1) % 12]; // Club und Akademie werden im Voraus fuer den Folgemonat berechnet
@@ -445,8 +445,58 @@ const Live = (() => {
         <tfoot><tr class="sum"><td>Gruppen je Woche</td><td></td>${clubUsed.map(p => `<td class="r num">${unit(clubSum(p))}</td>`).join('')}<td></td></tr>
           <tr class="sum"><td>Club gesamt</td><td></td>${clubUsed.map(p => `<td class="r num">${m2(clubSum(p) * (mo.prices[p] || 0))}</td>`).join('')}<td class="r num"><b>${m2(clubRows.reduce((s, r) => s + r.summe, 0))}</b></td></tr></tfoot></table></div>
         <p class="hint">Monatsbeitrag je eingeplanter Gruppe pro Woche laut Wochenplan (Winterplan), im Voraus für ${nMon}. Wer zusätzlich Privattraining hat, steht unten noch einmal mit einer eigenen Rechnung.</p></section>` : '';
-    host.innerHTML = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) +
-      (clubHtml ? `<section class="panel"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div></section>` + clubHtml : '') +
+    // Turnierbetreuung: Betrag aus der Spalte „Bezahlung“ lesen („Elias, Pina 65,-€, Leon Vertrag“ = 2 × 65 €).
+    // Steht dort „Rechnung“ ohne Betrag, bleibt das Turnier als offen markiert.
+    const tbBetrag = t => {
+      const txt = String(t.bezahlung || '').replace(/\s+/g, ' '), teile = [];
+      const re = /(\d+(?:,\d{1,2})?)\s*,?-?\s*€/g, STOP = /^(rechnung|re|je|an|rest|und|alle|außer)$/i;
+      const namen = seg => seg.split(/[,.&]|\bund\b/).filter(p => !/vertrag|kostenfrei|rest/i.test(p))
+        .flatMap(p => p.replace(/[:=()\-]/g, ' ').trim().split(' ').filter(w => /^[A-ZÄÖÜ]/.test(w) && !STOP.test(w)).slice(0, 1));
+      let m, vor = 0;
+      while ((m = re.exec(txt))) {
+        let n = namen(txt.slice(vor, m.index));
+        if (!n.length) { const nach = txt.slice(re.lastIndex).split(/\d/)[0]; if (/^\s*an\b/i.test(nach)) n = namen(nach.replace(/^\s*an\b/i, '')); }
+        teile.push({ namen: n.length ? n : ['?'], betrag: +m[1].replace(',', '.') });
+        vor = re.lastIndex;
+      }
+      const sum = teile.reduce((s, x) => s + x.betrag * x.namen.length, 0);
+      return { sum, teile, offen: !teile.length && /rechnung/i.test(txt) };
+    };
+    const tbAll = fitMode ? [] : (mo.turniere || []).map(t => Object.assign({}, t, tbBetrag(t)));
+    const tbSum = tbAll.reduce((s, t) => s + t.sum, 0), tbOffen = tbAll.filter(t => t.offen).length;
+    // Monatsübersicht für die Finanzübersicht: Summen über alle Kunden (ohne Suchfilter)
+    const tRows = mo.rows.filter(r => fitMode ? r.tab === 'fitness' : r.tab !== 'fitness');
+    const sumOf = f => Math.round(tRows.reduce((s, r) => s + f(r), 0) * 100) / 100;
+    const prodSum = test => sumOf(r => Object.keys(r.units).filter(test).reduce((s, p) => s + r.units[p] * (mo.prices[p] || 0), 0));
+    const ov = fitMode
+      ? [['Training', sumOf(r => r.training), `${ML[mo.m]} · rückwirkend`], ['Remote', sumOf(r => r.remote || 0), `${nMon} · im Voraus`], ['Gesamt', sumOf(r => r.summe), `${tRows.filter(r => r.summe > 0).length} Kunden`]]
+      : [['Pro Coach', prodSum(p => /Pro Coach/.test(p)), `Privattraining ${ML[mo.m]}`], ['Asi Coach', prodSum(p => !/Pro Coach/.test(p) && !isClubP(p)), `Privattraining ${ML[mo.m]}`],
+        ['Hallenkosten', sumOf(r => r.halle || 0), `${ML[mo.m]} · Kunden ohne Abo`], ['Zusatz', sumOf(r => r.zusatz || 0), `${ML[mo.m]} · z. B. Gastgebühr`],
+        ['Vertrag (Akademie)', sumOf(r => r.vertrag || 0), `Monatsbeitrag ${nMon}`], ['Club', sumOf(r => r.club || 0), `Monatsbeitrag ${nMon} · Serienrechnung`],
+        ['Turnierbetreuung', Math.round(tbSum * 100) / 100, `${ML[mo.m]} · ${tbAll.length} Turniere${tbOffen ? ` · ${tbOffen} ohne Betrag` : ''}`]];
+    if (!fitMode) ov.push(['Gesamt', Math.round(ov.reduce((s, x) => s + x[1], 0) * 100) / 100, `${ML[mo.m]} / ${nMon}`]);
+    const ovHtml = `<section class="panel"><div class="panel-head"><h2>Monatsübersicht</h2><span class="sub">für die Finanzübersicht · alle Kunden</span></div>
+      <section class="tiles">${ov.map(([l, v, s]) => `<article class="tile"><div class="label">${l}</div><div class="value num">${m2(v)}</div><div class="what">${s}</div></article>`).join('')}</section></section>`;
+    const sw = `<section class="panel"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div></section>`;
+    const kopf = head(fitMode ? 'Trainingsabrechnung Fitness' : 'Trainingsabrechnung', 'Automatisch aus den Stundenlisten erzeugt, im Aufbau wie die bisherige Trainingsabrechnung. Zeile anklicken zeigt die einzelnen Termine. Preise im Blatt „Preise“, abweichende Schreibweisen von Namen im Blatt „Kunden-Alias“ der Einstellungs-Tabelle.', `<select id="a-month" aria-label="Monat">${opts}</select>`) + ovHtml;
+    if (view === 'turnier') {
+      const tb = tbAll.filter(t => !q || [t.turnier, t.spieler, t.bezahlung].join(' ').toLowerCase().includes(q));
+      const betragTxt = t => t.offen ? '<span class="ab-warn" title="Laut Bezahlung wird eine Rechnung gestellt, aber kein Betrag eingetragen">⚠ Betrag fehlt</span>'
+        : t.teile.length ? t.teile.map(x => `${esc(x.namen.join(', '))} ${x.namen.length > 1 ? 'je ' : ''}${m2(x.betrag)}`).join('<br>') : '<span class="sub">Vertrag / kostenfrei</span>';
+      host.innerHTML = kopf + sw + `<section class="panel"><div class="panel-head"><h2>Turnierbetreuung ${ML[mo.m]} ${mo.y}</h2><span class="sub">aus der Tabelle „Turnierbetreuungen“, Monat nach Turnierbeginn</span>
+        <div class="actions"><input id="a-q" class="search" placeholder="Turnier oder Spieler suchen" value="${esc(st.q || '')}"></div></div>
+        <div class="tbl-wrap"><table class="shop"><thead><tr><th>Turnier</th><th>Datum</th><th>Spieler</th><th>Trainer</th><th>Vergütung Trainer</th><th>Bezahlung</th><th>Erkannt</th><th class="r">Betrag</th></tr></thead>
+        <tbody>${tb.map(t => `<tr><td><b>${esc(t.turnier)}</b></td><td>${esc(t.von)}${t.bis && t.bis !== t.von ? ' – ' + esc(t.bis) : ''}</td><td>${esc(t.spieler)}</td><td>${esc(t.trainer)}</td><td>${esc(t.verguetung)}</td><td class="sub">${esc(t.bezahlung)}</td><td>${betragTxt(t)}</td><td class="r num"><b>${t.sum ? m2(t.sum) : ''}</b></td></tr>`).join('') || '<tr><td colspan="8" class="sub">Keine Turniere in diesem Monat.</td></tr>'}</tbody>
+        <tfoot><tr class="sum"><td>Summe</td><td colspan="6"></td><td class="r num"><b>${m2(tb.reduce((s, t) => s + t.sum, 0))}</b></td></tr></tfoot></table></div>
+        <p class="hint">Der Betrag wird aus der Spalte „Bezahlung“ gelesen (z. B. „Elias, Pina 65,-€, Leon Vertrag“ = 2 × 65 €). Bitte in der Spalte „Erkannt“ gegenprüfen. Turniere mit „Rechnung“, aber ohne Betrag sind mit ⚠ markiert und zählen nicht zur Summe. Die Rechnungen dafür laufen weiter von Hand über Lexoffice.</p></section>`;
+      $('a-month').value = String(sel);
+      $('a-month').addEventListener('change', e => { st.month = +e.target.value; drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); });
+      host.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.v; drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); }));
+      $('a-q').addEventListener('input', e => { st.q = e.target.value; const p = e.target.selectionStart; drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); const i = $('a-q'); i.focus(); i.setSelectionRange(p, p); });
+      return;
+    }
+    host.innerHTML = kopf +
+      (clubHtml ?`<section class="panel"><div class="seg-switch" role="group">${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div></section>` + clubHtml : '') +
       `<section class="panel"><div class="panel-head">${clubHtml ? `<h2>Asi Coach – Privattraining ${ML[mo.m]}</h2>` : ''}<div class="seg-switch" role="group" ${fitMode || clubHtml ? 'hidden' : ''}>${views.map(([k, l]) => `<button type="button" data-v="${k}" aria-pressed="${k === view}">${l}</button>`).join('')}</div>
         <div class="actions"><input id="a-q" class="search" placeholder="Kunde suchen" value="${esc(st.q || '')}"><button class="btn ghost" type="button" id="a-csv">CSV</button>${!isCur && all.some(r => !lexId(r) && r.summe > 0) ? `<button class="btn" type="button" id="a-lexall">Alle als Lexoffice-Entwurf (${all.filter(r => !lexId(r) && r.summe > 0).length})</button>` : ''}</div></div>
         <div class="tbl-wrap"><table class="shop abr"><thead><tr><th>Name</th><th>Vorname</th>${used.map(p => `<th class="r">${esc(short(p))}</th>`).join('')}${extra.map(([, t]) => `<th class="r">${t}</th>`).join('')}<th class="r">Summe</th><th class="r lex-col">Lexoffice</th></tr>
