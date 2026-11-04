@@ -376,9 +376,10 @@ const Live = (() => {
     const nur = (r, club) => { const u = {}; Object.keys(r.units).forEach(p => { if (r.units[p] && isClubP(p) === club) u[p] = r.units[p]; }); return u; };
     const privOf = r => { const u = nur(r, false); return Object.assign({}, r, { units: u, summe: Math.round((r.summe - (r.club || 0)) * 100) / 100,
       ptab: r.tab === 'fitness' ? 'fitness' : r.tab === 'pro' || Object.keys(u).some(p => /Pro Coach/.test(p)) ? 'pro' : 'asi' }); };
-    const clubOf = r => Object.assign({}, r, { units: nur(r, true), summe: r.club || 0, halle: 0, vertrag: 0, zusatz: 0, pruefen: [] });
-    const sortRows = (a, b) => (b.vertrag > 0) - (a.vertrag > 0) || split(a.name)[0].localeCompare(split(b.name)[0], 'de') || a.name.localeCompare(b.name, 'de');
-    const all = (fitMode ? mo.rows.filter(r => r.tab === 'fitness') : mo.rows.filter(r => r.tab !== 'fitness').map(privOf).filter(r => r.ptab === view && (r.summe > 0 || r.vertrag > 0))).sort(sortRows);
+    const clubOf = r => Object.assign({}, r, { units: nur(r, true), summe: r.club || 0, halle: 0, vertrag: 0, pauschale: 0, turnier: 0, zusatz: 0, pruefen: [] });
+    const isVS = r => r.vertrag > 0 || r.pauschale > 0;
+    const sortRows = (a, b) => isVS(b) - isVS(a) || split(a.name)[0].localeCompare(split(b.name)[0], 'de') || a.name.localeCompare(b.name, 'de');
+    const all = (fitMode ? mo.rows.filter(r => r.tab === 'fitness') : mo.rows.filter(r => r.tab !== 'fitness').map(privOf).filter(r => r.ptab === view && (r.summe > 0 || isVS(r)))).sort(sortRows);
     const clubAll = fitMode || view !== 'asi' ? [] : mo.rows.filter(r => r.tab !== 'fitness' && r.club > 0).map(clubOf).sort(sortRows);
     const clubRows = clubAll.filter(r => !q || r.name.toLowerCase().includes(q));
     const rows = all.filter(r => !q || r.name.toLowerCase().includes(q));
@@ -390,7 +391,7 @@ const Live = (() => {
     const short = p => p === 'Fitness' ? '2-4 60' : p === 'Fitness PT' ? 'PT 60' : p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     // Feste Spalten je Firma
     const nMon = ML[(mo.m + 1) % 12]; // Club und Akademie werden im Voraus fuer den Folgemonat berechnet
-    const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['vertrag', `Vertrag ${nMon.slice(0, 3)}.`, `Vertrag ${nMon}`], ['zusatz', 'Zusatz', 'Zusatzkosten']];
+    const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['pauschale', 'Vertrags&shy;kosten', 'Vertragskosten'], ['vertrag', `Monats&shy;beitrag ${nMon.slice(0, 3)}.`, `Monatsbeitrag ${nMon}`], ['turnier', 'Turnier', 'Turnierbetreuung'], ['zusatz', 'Zusatz', 'Zusatzkosten']];
     const vsS = fitMode ? [] : (mo.vsStunden || []);
     const vsHtml = vsS.length ? `<section class="panel"><div class="panel-head"><h2>Vertragsspieler – gespielte Stunden ${ML[mo.m]}</h2><span class="sub">nur zur Kontrolle, wird nicht berechnet</span></div>
       <div class="tbl-wrap"><table class="shop"><thead><tr><th>Spieler</th><th class="r">Tennis h</th><th class="r">Fitness h</th><th class="r">Termine</th><th class="r">Vertrag</th></tr></thead>
@@ -405,7 +406,7 @@ const Live = (() => {
       ${abS.length ? `<h3>Nur in der Stundenliste – im Wochenplan an dem Tag nicht gefunden (wird berechnet)</h3><div class="tbl-wrap"><table class="shop"><tbody>${abS.map(abRow).join('')}</tbody></table></div>` : ''}
       ${abW.length ? `<h3>Nur im Wochenplan – in der Stundenliste an dem Tag nicht eingetragen (wird nicht berechnet)</h3><div class="tbl-wrap"><table class="shop"><tbody>${abW.map(abRow).join('')}</tbody></table></div>` : ''}
       <p class="hint">Verglichen werden Kunde und Tag (nicht die Uhrzeit), nur vergangene Tage. Vertragsspieler, Club-Gruppen und Abos sind ausgenommen.</p></section>` : '';
-    const firstPriv = rows.findIndex(r => !r.vertrag);
+    const firstPriv = rows.findIndex(r => !isVS(r));
     const ym = mo.y + '-' + String(mo.m + 1).padStart(2, '0');
     const ck = s => s.toLowerCase().replace(/\(.*?\)/g, ' ').replace(/\./g, ' ').replace(/ß/g, 'ss').replace(/\s+/g, ' ').trim();
     A.lex = A.lex || {};
@@ -430,8 +431,11 @@ const Live = (() => {
     const busy = A.lexBusy = A.lexBusy || {};
     const doppelt = r => (A.lexDoppelt || {})[lexKey + '|' + ck(r.name)];
     const lexCell = r => `<td class="r lex-col">${busy[r.name] ? '<span class="chip-draft">Lege an …</span>' : lexId(r) ? lexChip(r) + (doppelt(r) ? ` <span class="ab-warn" title="In Lexoffice gibt es ${doppelt(r)} Entwürfe für diesen Kunden und Monat – bitte einen löschen">⚠ ${doppelt(r)}×</span>` : '') : isCur ? '' : unklar(r) ? `<button class="btn ghost sm warn-btn" data-lex="${esc(r.name)}" data-check="1" title="${esc(r.pruefen.join('\n'))}">⚠ prüfen</button>` : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
-    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && r.vertrag ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
-        ${extra.map(([k]) => `<td class="r num">${r[k] ? m2(r[k]) : ''}</td>`).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
+    // Beträge von Hand ändern: Zelle anklicken (gespeichert im Blatt „Abrechnung-Korrekturen“)
+    const isKorr = (r, k) => (r.korr || []).includes(k);
+    const editCell = (r, k, t) => `<td class="r num edit-cell${isKorr(r, k) ? ' korr' : ''}" data-edit="${k}" data-n="${esc(r.name)}" data-t="${esc(t)}" title="${isKorr(r, k) ? `von Hand geändert – berechnet: ${m2((r.basis || {})[k] || 0)}. ` : ''}Anklicken zum Ändern">${r[k] ? m2(r[k]) : ''}${isKorr(r, k) ? ' <span class="korr-mark">✎</span>' : ''}</td>`;
+    const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && isVS(r) ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
+        ${extra.map(([k, , t]) => editCell(r, k, t)).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
     const unitsSum = p => rows.reduce((s, r) => s + (r.units[p] || 0), 0);
     const clubUsed = ['Club 45', 'Club 60', 'Club 90'].filter(p => clubAll.some(r => r.units[p]));
@@ -472,8 +476,9 @@ const Live = (() => {
       ? [['Training', sumOf(r => r.training), `${ML[mo.m]} · rückwirkend`], ['Remote', sumOf(r => r.remote || 0), `${nMon} · im Voraus`], ['Gesamt', sumOf(r => r.summe), `${tRows.filter(r => r.summe > 0).length} Kunden`]]
       : [['Pro Coach', prodSum(p => /Pro Coach/.test(p)), `Privattraining ${ML[mo.m]}`], ['Asi Coach', prodSum(p => !/Pro Coach/.test(p) && !isClubP(p)), `Privattraining ${ML[mo.m]}`],
         ['Hallenkosten', sumOf(r => r.halle || 0), `${ML[mo.m]} · Kunden ohne Abo`], ['Zusatz', sumOf(r => r.zusatz || 0), `${ML[mo.m]} · z. B. Gastgebühr`],
-        ['Vertrag (Akademie)', sumOf(r => r.vertrag || 0), `Monatsbeitrag ${nMon}`], ['Club', sumOf(r => r.club || 0), `Monatsbeitrag ${nMon} · Serienrechnung`],
-        ['Turnierbetreuung', Math.round(tbSum * 100) / 100, `${ML[mo.m]} · ${tbAll.length} Turniere${tbOffen ? ` · ${tbOffen} ohne Betrag` : ''}`]];
+        ['Monatsbeitrag Akademie', sumOf(r => r.vertrag || 0), `${nMon} · Vertragsspieler`], ['Vertragskosten', sumOf(r => r.pauschale || 0), `Jahrespauschalen · Vertragsbeginn ${nMon}`],
+        ['Club', sumOf(r => r.club || 0), `Monatsbeitrag ${nMon} · Serienrechnung`],
+        ['Turnierbetreuung', sumOf(r => r.turnier || 0), `${ML[mo.m]} · laut Turnierliste ${m2(Math.round(tbSum * 100) / 100)}${tbOffen ? ` · ${tbOffen}× ohne Betrag` : ''}`]];
     if (!fitMode) ov.push(['Gesamt', Math.round(ov.reduce((s, x) => s + x[1], 0) * 100) / 100, `${ML[mo.m]} / ${nMon}`]);
     const ovHtml = `<section class="panel"><div class="panel-head"><h2>Monatsübersicht</h2><span class="sub">für die Finanzübersicht · alle Kunden</span></div>
       <section class="tiles">${ov.map(([l, v, s]) => `<article class="tile"><div class="label">${l}</div><div class="value num">${m2(v)}</div><div class="what">${s}</div></article>`).join('')}</section></section>`;
@@ -488,7 +493,7 @@ const Live = (() => {
         <div class="tbl-wrap"><table class="shop"><thead><tr><th>Turnier</th><th>Datum</th><th>Spieler</th><th>Trainer</th><th>Vergütung Trainer</th><th>Bezahlung</th><th>Erkannt</th><th class="r">Betrag</th></tr></thead>
         <tbody>${tb.map(t => `<tr><td><b>${esc(t.turnier)}</b></td><td>${esc(t.von)}${t.bis && t.bis !== t.von ? ' – ' + esc(t.bis) : ''}</td><td>${esc(t.spieler)}</td><td>${esc(t.trainer)}</td><td>${esc(t.verguetung)}</td><td class="sub">${esc(t.bezahlung)}</td><td>${betragTxt(t)}</td><td class="r num"><b>${t.sum ? m2(t.sum) : ''}</b></td></tr>`).join('') || '<tr><td colspan="8" class="sub">Keine Turniere in diesem Monat.</td></tr>'}</tbody>
         <tfoot><tr class="sum"><td>Summe</td><td colspan="6"></td><td class="r num"><b>${m2(tb.reduce((s, t) => s + t.sum, 0))}</b></td></tr></tfoot></table></div>
-        <p class="hint">Der Betrag wird aus der Spalte „Bezahlung“ gelesen (z. B. „Elias, Pina 65,-€, Leon Vertrag“ = 2 × 65 €). Bitte in der Spalte „Erkannt“ gegenprüfen. Turniere mit „Rechnung“, aber ohne Betrag sind mit ⚠ markiert und zählen nicht zur Summe. Die Rechnungen dafür laufen weiter von Hand über Lexoffice.</p></section>`;
+        <p class="hint">Der Betrag wird aus der Spalte „Bezahlung“ gelesen (z. B. „Elias, Pina 65,-€, Leon Vertrag“ = 2 × 65 €). Bitte in der Spalte „Erkannt“ gegenprüfen. Turniere mit „Rechnung“, aber ohne Betrag sind mit ⚠ markiert und zählen nicht zur Summe. Damit ein Betrag auf die Rechnung und in die Monatsübersicht kommt, im Reiter Pro Coach bzw. Asi Coach beim Spieler in der Spalte „Turnier“ eintragen (Zelle anklicken).</p></section>`;
       $('a-month').value = String(sel);
       $('a-month').addEventListener('change', e => { st.month = +e.target.value; drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); });
       host.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.v; drawAbrechnung(host, company); bindRefresh(host, 'abrechnung', company); }));
@@ -513,6 +518,25 @@ const Live = (() => {
     $('a-month').addEventListener('change', e => { st.month = +e.target.value; redraw(); });
     host.querySelectorAll('[data-v]').forEach(b => b.addEventListener('click', () => { st.view = b.dataset.v; redraw(); }));
     $('a-q').addEventListener('input', e => { st.q = e.target.value; const p = e.target.selectionStart; redraw(); const i = $('a-q'); i.focus(); i.setSelectionRange(p, p); });
+    host.querySelectorAll('[data-edit]').forEach(td => td.addEventListener('click', async e => {
+      e.stopPropagation();
+      const k = td.dataset.edit, r = mo.rows.find(x => x.name === td.dataset.n && (x.tab === 'fitness') === fitMode);
+      if (!r || td.dataset.busy) return;
+      const basis = isKorr(r, k) ? (r.basis || {})[k] || 0 : r[k] || 0;
+      const ein = window.prompt(`${td.dataset.t} für ${r.name} (${ML[mo.m]} ${mo.y})\n\nBetrag in € eingeben. Leer lassen = berechneter Wert (${m2(basis)}).`, r[k] ? String(r[k]).replace('.', ',') : '');
+      if (ein === null) return;
+      const t = ein.trim().replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
+      if (t !== '' && !(+t >= 0)) return toast('Bitte einen Betrag eingeben, z. B. 65 oder 1.950,00');
+      td.dataset.busy = '1'; td.textContent = '…';
+      try {
+        const res = await fetch((window.SK_CONFIG || {}).live, { method: 'POST', body: JSON.stringify({ token: await Auth.token(), action: 'abrKorrektur', co: fitMode ? 'fitness' : 'tennis', ym, name: r.name, feld: k, wert: t === '' ? '' : +t }) });
+        const d = await res.json();
+        if (!d.ok) throw new Error(d.error === 'forbidden' ? 'Nur für den Admin-Zugang.' : d.error || 'Keine Antwort');
+        if (d.row) mo.rows[mo.rows.indexOf(r)] = d.row;
+        toast(lexId(r) ? 'Gespeichert – der Lexoffice-Entwurf besteht schon, bitte dort auch anpassen' : 'Gespeichert');
+      } catch (err) { toast(err.message || String(err)); }
+      redraw();
+    }));
     host.querySelectorAll('.abr-row').forEach(tr => tr.addEventListener('click', () => { const d = host.querySelector(`[data-d="${tr.dataset.i}"]`); d.hidden = !d.hidden; }));
     // Entwürfe in Lexoffice anlegen (je Aufruf max. 12 Kunden, damit Google nicht abbricht)
     const lexSend = async (names, btn, bestaetigt) => {
