@@ -381,3 +381,4 @@ table.abr td.edit-cell { cursor: pointer; }
 table.abr td.edit-cell:hover { outline: 1px dashed currentColor; outline-offset: -3px; }
 table.abr td.korr { background: rgba(245, 180, 0, .14); }
 .korr-mark { font-size: .8em; opacity: .7; }
+.tiles-1 { grid-template-columns: minmax(0, 1fr) !important; max-width: 520px; }

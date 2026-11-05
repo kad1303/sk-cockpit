@@ -93,7 +93,7 @@ const Live = (() => {
     if (tab === 'trainer') drawTrainer(company, host, 'Trainerauslastung');
     if (tab === 'halle') drawHalleTab(host);
     if (tab === 'rendite') drawRendite(host);
-    if (tab === 'ziele') drawZiele(host);
+    if (tab === 'ziele') drawZiele(host, company);
     if (tab === 'abrechnung') drawAbrechnung(host, company);
     if (tab === 'buchhaltung') drawBuchhaltung(company, host);
     const rb = $('live-refresh');
@@ -328,36 +328,40 @@ const Live = (() => {
     });
   }
 
-  // ---------- Ziele (Privattraining Tennis + Fitness gegen Monatsziel) ----------
-  function drawZiele(host) {
-    const Z = data.ziele, st = ui.ziele;
+  // ---------- Ziele (Privattraining gegen Monatsziel, je Firma) ----------
+  // Abgeschlossene Monate vor Oktober 2026: Werte aus der Finanzübersicht (quelle 'finanz'), danach aus der Cockpit-Abrechnung
+  function drawZiele(host, company) {
+    const Z = data.ziele, fit = company === 'fitness', st = fit ? (ui.zieleF = ui.zieleF || {}) : ui.ziele, k = fit ? 'fitness' : 'tennis';
     const now = new Date(), last = Z.months.length - 1;
     const sel = st.month === undefined ? last : st.month;
     const mo = Z.months[sel], isCur = sel === last;
     const dim = new Date(mo.y, mo.m + 1, 0).getDate();
     const day = isCur ? now.getDate() : dim;
-    const goal = { tennis: Z.ziele.tennis || 0, fitness: Z.ziele.fitness || 0 };
-    const val = { tennis: mo.tennis, fitness: mo.fitness };
-    const tot = val.tennis + val.fitness, gTot = goal.tennis + goal.fitness;
+    const goal = Z.ziele[k] || 0, val = mo[k];
     const m2 = v => de2.format(v) + ' €';
+    const quelle = x => x.quelle === 'finanz' ? 'Finanzübersicht' : 'Stundenlisten';
     const opts = Z.months.map((x, i) => i).reverse().map(i => `<option value="${i}">${ML[Z.months[i].m]} ${Z.months[i].y}${i === last ? ' (bis heute)' : ''}</option>`).join('');
     const bar = (v, g) => { const p = g ? v / g * 100 : 0; const cls = p >= 100 ? 'good' : p >= 80 ? 'warn' : 'crit'; return `<span class="tr-bar"><span class="tr-ist ${cls}" style="width:${Math.min(100, p)}%"></span></span>`; };
     const tile = (label, v, g, extra) => `<article class="tile"><div class="label">${label}</div><div class="value num">${eur(v)}</div>
-      <div class="what">Ziel ${eur(g)} · <b>${g ? pct0(v / g * 100) : '–'}</b>${g > v ? ` · es fehlen ${eur(g - v)}` : ' · Ziel erreicht'}</div>${bar(v, g)}${extra || ''}</article>`;
+      ${g ? `<div class="what">Ziel ${eur(g)} · <b>${pct0(v / g * 100)}</b>${g > v ? ` · es fehlen ${eur(g - v)}` : ' · Ziel erreicht'}</div>${bar(v, g)}` : ''}${extra || ''}</article>`;
     const prog = v => isCur && day < dim ? `<div class="what">Hochgerechnet auf den Monat: <b>${eur(v / day * dim)}</b></div>` : '';
-    const rest = isCur && day < dim && gTot > tot ? `<p class="sub">Für das Gesamtziel fehlen noch ${m2(gTot - tot)} – das sind ${m2((gTot - tot) / (dim - day))} pro restlichem Kalendertag (${dim - day} Tage).</p>` : '';
-    const hist = Z.months.map((x, i) => `<li><span class="tr-name">${MS[x.m]} ${String(x.y).slice(2)}</span>${bar(x.tennis + x.fitness, gTot)}<span class="num tr-val">${eur(x.tennis + x.fitness)}</span><span class="num tr-pct">${gTot ? pct0((x.tennis + x.fitness) / gTot * 100) : '–'}</span></li>`).join('');
-    host.innerHTML = head('Ziele', 'Einnahmen aus Privattraining (Tennis: Pro + Asi Coach, ohne Club und Vertragsspieler; Fitness: Training bei Alex) laut Stundenlisten, verglichen mit den Monatszielen. Die Ziele stehen in der Einstellungs-Tabelle im Blatt „Ziele“.', `<select id="z-month" aria-label="Monat">${opts}</select>`) +
-      `<section class="tiles tiles-3">${tile('Gesamt', tot, gTot, prog(tot))}${tile('Tennis', val.tennis, goal.tennis, prog(val.tennis) + (mo.pro !== undefined ? `<div class="what">Pro Coach <b>${eur(mo.pro)}</b> · Asi Coach <b>${eur(mo.asi)}</b></div>` : '') + `<div class="what">${mo.kunden.tennis} Kunden</div>`)}${tile('Fitness', val.fitness, goal.fitness, prog(val.fitness) + `<div class="what">${mo.kunden.fitness} Kunden${mo.pt ? ` · davon PT ${eur(mo.pt)}` : ''}</div>`)}</section>
-      <section class="panel"><div class="panel-head"><h2>${ML[mo.m]} ${mo.y}${isCur ? ' (bis heute)' : ''}</h2></div>${rest || '<p class="sub">' + (tot >= gTot ? 'Das Monatsziel ist erreicht.' : 'Monat abgeschlossen.') + '</p>'}
-      <p class="hint">Grundlage sind die eingetragenen Trainings in den Stundenlisten, bewertet mit den Preisen aus dem Blatt „Preise“ – also eine Planabrechnung, keine Zahlungseingänge.</p></section>
-      ${mo.pro !== undefined ? `<section class="panel"><div class="panel-head"><h2>Tennis nach Bereich</h2><span class="sub">Privattraining ohne Club und Vertragsspieler</span></div>
+    const rest = isCur && day < dim && goal > val ? `<p class="sub">Bis zum Ziel fehlen noch ${m2(goal - val)} – das sind ${m2((goal - val) / (dim - day))} pro restlichem Kalendertag (${dim - day} Tage).</p>` : '';
+    const kunden = mo.kunden ? `<div class="what">${mo.kunden[k]} Kunden${fit && mo.pt ? ` · davon PT ${eur(mo.pt)}` : ''}</div>` : '';
+    const tiles = fit ? tile('Fitness', val, goal, prog(val) + kunden)
+      : tile('Tennis', val, goal, prog(val) + kunden) + tile('Pro Coach', mo.pro, 0, `<div class="what">${val ? pct0(mo.pro / val * 100) + ' vom Tennis-Umsatz' : ''}</div>`) + tile('Asi Coach', mo.asi, 0, `<div class="what">${val ? pct0(mo.asi / val * 100) + ' vom Tennis-Umsatz' : ''}</div>`);
+    const hist = Z.months.map(x => `<li><span class="tr-name">${MS[x.m]} ${String(x.y).slice(2)}</span>${bar(x[k], goal)}<span class="num tr-val">${eur(x[k])}</span><span class="num tr-pct">${goal ? pct0(x[k] / goal * 100) : '–'}</span></li>`).join('');
+    host.innerHTML = head(fit ? 'Ziele Fitness' : 'Ziele Tennis', (fit ? 'Einnahmen aus dem Fitness-Privattraining bei Alex (inkl. PT, ohne Remote)' : 'Einnahmen aus dem Tennis-Privattraining (Pro + Asi Coach, ohne Club und Vertragsspieler)') + ' verglichen mit dem Monatsziel. Bis September 2026 die abgerechneten Werte aus der Finanzübersicht, ab Oktober aus der Cockpit-Abrechnung (Stundenlisten). Die Ziele stehen im Blatt „Ziele“ der Einstellungs-Tabelle.', `<select id="z-month" aria-label="Monat">${opts}</select>`) +
+      `<section class="tiles${fit ? ' tiles-1' : ' tiles-3'}">${tiles}</section>
+      <section class="panel"><div class="panel-head"><h2>${ML[mo.m]} ${mo.y}${isCur ? ' (bis heute)' : ''}</h2><span class="sub">Quelle: ${quelle(mo)}</span></div>${rest || '<p class="sub">' + (val >= goal ? 'Das Monatsziel ist erreicht.' : 'Monat abgeschlossen.') + '</p>'}
+      <p class="hint">${mo.quelle === 'finanz' ? 'Wert aus der Finanzübersicht – so wurde der Monat abgerechnet.' : 'Grundlage sind die eingetragenen Trainings in den Stundenlisten, bewertet mit den Preisen aus dem Blatt „Preise“ – also die Abrechnung, keine Zahlungseingänge.'}</p></section>
+      ${fit ? '' : `<section class="panel"><div class="panel-head"><h2>Tennis nach Bereich</h2><span class="sub">Privattraining ohne Club und Vertragsspieler</span></div>
         <div class="tbl-wrap"><table class="shop"><thead><tr><th>Bereich</th>${Z.months.map(x => `<th class="r">${MS[x.m]} ${String(x.y).slice(2)}</th>`).join('')}</tr></thead><tbody>
-        ${[['Pro Coach', 'pro'], ['Asi Coach', 'asi']].map(([lab, k]) => `<tr><td><b>${lab}</b></td>${Z.months.map(x => `<td class="r num">${x[k] !== undefined ? eur(x[k]) : '–'}${x.tennis && x[k] !== undefined ? `<div class="sub">${pct0(x[k] / x.tennis * 100)}</div>` : ''}</td>`).join('')}</tr>`).join('')}
-        <tr class="sum"><td>Tennis gesamt</td>${Z.months.map(x => `<td class="r num"><b>${eur(x.tennis)}</b></td>`).join('')}</tr></tbody></table></div></section>` : ''}
-      <section class="panel"><div class="panel-head"><h2>Letzte Monate</h2><span class="sub">Gesamtziel ${eur(gTot)}</span></div><ul class="trainers">${hist}</ul></section>`;
+        ${[['Pro Coach', 'pro'], ['Asi Coach', 'asi']].map(([lab, kk]) => `<tr><td><b>${lab}</b></td>${Z.months.map(x => `<td class="r num">${eur(x[kk])}${x.tennis ? `<div class="sub">${pct0(x[kk] / x.tennis * 100)}</div>` : ''}</td>`).join('')}</tr>`).join('')}
+        <tr class="sum"><td>Tennis gesamt</td>${Z.months.map(x => `<td class="r num"><b>${eur(x.tennis)}</b></td>`).join('')}</tr>
+        <tr><td class="sub">Quelle</td>${Z.months.map(x => `<td class="r sub">${quelle(x)}</td>`).join('')}</tr></tbody></table></div></section>`}
+      <section class="panel"><div class="panel-head"><h2>Letzte Monate</h2><span class="sub">Monatsziel ${eur(goal)}</span></div><ul class="trainers">${hist}</ul></section>`;
     const s = $('z-month'); s.value = String(sel);
-    s.addEventListener('change', e => { st.month = +e.target.value; drawZiele(host); bindRefresh(host, 'ziele'); });
+    s.addEventListener('change', e => { st.month = +e.target.value; drawZiele(host, company); bindRefresh(host, 'ziele', company); });
   }
 
   // ---------- Trainingsabrechnung (aus den Stundenlisten) ----------
