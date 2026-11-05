@@ -297,12 +297,13 @@ const Live = (() => {
     const oh = Math.floor(H.open / 60);
     const since = H.since ? new Date(H.since + 'T12:00:00') : null;
     const missing = !since || since > weeks[0].start;
-    host.innerHTML = head('Hallenauslastung', `Alle Belegungen aus eBuSy (Einzel- und Abobuchungen, auch von Externen, plus eigenes Training) auf ${H.courts} Plätzen, gezählt ${String(oh).padStart(2, '0')}–${Math.ceil(H.close / 60)} Uhr. 100 % = jede Stunde auf jedem Platz belegt.`) +
+    host.innerHTML = head('Hallenauslastung', `Alle Belegungen aus eBuSy (Einzel- und Abobuchungen, auch von Externen, plus eigenes Training) auf ${H.courts} Plätzen, gezählt ${String(oh).padStart(2, '0')}–${Math.ceil(H.close / 60)} Uhr. 100 % = jede Stunde auf jedem Platz belegt. Eigenes Training laut Wochenplan (nur Platz 1–3, ohne Trebur/Walldorf).`) +
       `<section class="tiles">${tile('Diese Woche', W0.p, `${ph(W0)} · ab ${fmtW(W0)}, inkl. schon gebuchter Tage${trainTxt(W0)}`, 'var(--accent)', pyWeek(W0).p)}
         ${tile('Letzte Woche', Wm1.p, `${ph(Wm1)} · ab ${fmtW(Wm1)}${trainTxt(Wm1)}`, 'var(--c-sonst)', pyWeek(Wm1).p)}
         ${tile('Nächste Woche', Wp1.p, `${ph(Wp1)} · schon gebucht`, 'var(--in)')}
         ${tile('Letzte 4 Wochen', l4n ? l4min / (l4n * cap) * 100 : null, `${de0.format(l4min / 60)} von ${de0.format(l4n * cap / 60)} Platzstunden${l4min ? ' · davon ' + de0.format(l4t / l4min * 100) + ' % Training' : ''}`, 'var(--c-pers)', l4py)}</section>
-      <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>`;
+      <section class="panel"><div><h2>Auslastung je Woche</h2><p class="explain">Helle Säulen sind kommende Wochen: so viel ist schon gebucht.${missing ? ` eBuSy zeigt vergangene Tage nicht an. Die Belegung wird deshalb seit ${since ? since.toLocaleDateString('de-DE') : 'heute'} stündlich gespeichert, die Historie wächst ab dann.` : ''}</p></div><div class="chart" id="h-weeks"></div></section>` +
+      ((H.unklar || []).length ? `<section class="panel"><div class="panel-head"><h2>Im Wochenplan nicht zugeordnet</h2><span class="sub">zählt nicht als eigenes Training</span></div><ul class="hint-list">${H.unklar.map(u => `<li>${esc(u.text)} <span class="sub">· ${u.mal}× · ${de1.format(u.min / 60).replace(/,0$/, '')} h</span></li>`).join('')}</ul><p class="hint">Zuordnen im Blatt „Halle-Wochenplan“ der Einstellungs-Tabelle: Eintrag wie im Wochenplan, dazu „ja“ (eigenes Training) oder „nein“.</p></section>` : '');
     bars($('h-weeks'), weeks.map(w => ({ label: fmtW(w), v: w.p || 0, top: w.p === null ? '' : de0.format(w.p), future: w.future, hl: w.current })), v => v + ' %', 100);
   }
 

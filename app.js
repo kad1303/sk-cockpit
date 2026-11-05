@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '50';
+const APP_VERSION = '51';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
