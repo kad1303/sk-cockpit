@@ -5,7 +5,7 @@
    ============================================================ */
 
 // Bei jeder Änderung hochzählen – und gleich in version.json eintragen.
-const APP_VERSION = '52';
+const APP_VERSION = '53';
 
 const PREF_KEY = 'skcockpit:prefs';
 const app = document.getElementById('app');
@@ -94,7 +94,7 @@ async function loadAll() {
   state.me = me[0] || null;
   state.companies = companies;
   state.docs = {};
-  for (const d of docs) (state.docs[d.company] = state.docs[d.company] || {})[d.year] = d;
+  for (const d of docs) (state.docs[d.company] = state.docs[d.company] || {})[d.year] = BWA.trimEmpty(d);
 }
 
 async function boot() {

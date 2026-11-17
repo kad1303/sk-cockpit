@@ -107,10 +107,24 @@ const BWA = (() => {
     let skip = 0;
     while (skip < n - 1 && Object.values(out).every(arr => arr[skip] === 0)) skip++;
     if (skip) for (const k in out) out[k] = out[k].slice(skip);
-    return { firma, stand: stand || (ML[months[n - 1]] + ' ' + year), erstellt: erstellt || null, year, months: months.slice(skip), rows: out, checks };
+    return trimEmpty({ firma, stand: stand || (ML[months[n - 1]] + ' ' + year), erstellt: erstellt || null, year, months: months.slice(skip), rows: out, checks });
+  }
+
+  // Genullte Monate am Jahresende weglassen: DATEV druckt bei unterjaehrigen BWAs oft schon
+  // Nov/Dez mit 0,00 mit. Ein Monat ohne Umsatz und ohne Kosten ist noch nicht gebucht.
+  // Wirkt auch auf bereits gespeicherte BWAs (beim Laden).
+  function trimEmpty(doc) {
+    const r = doc.rows || {}, z = v => !v || Math.abs(v) < 0.005;
+    let n = (doc.months || []).length;
+    while (n > 1 && z((r.umsatz || [])[n - 1]) && z((r.gk || [])[n - 1])) n--;
+    if (n === doc.months.length) return doc;
+    const rows = {};
+    for (const k in r) rows[k] = Array.isArray(r[k]) ? r[k].slice(0, n) : r[k];
+    const months = doc.months.slice(0, n);
+    return Object.assign({}, doc, { months, rows, stand: ML[months[n - 1]] + ' ' + doc.year });
   }
 
   async function read(file) { return parse(await extractLines(file)); }
 
-  return { read, extractLines };
+  return { read, extractLines, trimEmpty };
 })();
