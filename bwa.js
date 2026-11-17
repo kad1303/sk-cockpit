@@ -111,12 +111,13 @@ const BWA = (() => {
   }
 
   // Genullte Monate am Jahresende weglassen: DATEV druckt bei unterjaehrigen BWAs oft schon
-  // Nov/Dez mit 0,00 mit. Ein Monat ohne Umsatz und ohne Kosten ist noch nicht gebucht.
+  // Nov/Dez mit 0,00 mit. Ein Monat ohne Umsatz ist noch nicht gebucht (einzelne Vorab-
+  // Buchungen wie -225 EUR Sonstige Kosten im Dez. aendern daran nichts).
   // Wirkt auch auf bereits gespeicherte BWAs (beim Laden).
   function trimEmpty(doc) {
     const r = doc.rows || {}, z = v => !v || Math.abs(v) < 0.005;
     let n = (doc.months || []).length;
-    while (n > 1 && z((r.umsatz || [])[n - 1]) && z((r.gk || [])[n - 1])) n--;
+    while (n > 1 && z((r.umsatz || [])[n - 1])) n--;
     if (n === doc.months.length) return doc;
     const rows = {};
     for (const k in r) rows[k] = Array.isArray(r[k]) ? r[k].slice(0, n) : r[k];
