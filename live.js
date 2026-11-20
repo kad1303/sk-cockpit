@@ -377,7 +377,7 @@ const Live = (() => {
     const nur = (r, club) => { const u = {}; Object.keys(r.units).forEach(p => { if (r.units[p] && isClubP(p) === club) u[p] = r.units[p]; }); return u; };
     const privOf = r => { const u = nur(r, false); return Object.assign({}, r, { units: u, summe: Math.round((r.summe - (r.club || 0)) * 100) / 100,
       ptab: r.tab === 'fitness' ? 'fitness' : r.tab === 'pro' || Object.keys(u).some(p => /Pro Coach/.test(p)) ? 'pro' : 'asi' }); };
-    const clubOf = r => Object.assign({}, r, { units: nur(r, true), summe: r.club || 0, halle: 0, vertrag: 0, pauschale: 0, turnier: 0, zusatz: 0, pruefen: [] });
+    const clubOf = r => Object.assign({}, r, { units: nur(r, true), summe: r.club || 0, halle: 0, vertrag: 0, pauschale: 0, turnier: 0, zusatz: 0, rabatt: 0, pruefen: [] });
     const isVS = r => r.vertrag > 0 || r.pauschale > 0;
     const sortRows = (a, b) => isVS(b) - isVS(a) || split(a.name)[0].localeCompare(split(b.name)[0], 'de') || a.name.localeCompare(b.name, 'de');
     const all = (fitMode ? mo.rows.filter(r => r.tab === 'fitness') : mo.rows.filter(r => r.tab !== 'fitness').map(privOf).filter(r => r.ptab === view && (r.summe > 0 || isVS(r)))).sort(sortRows);
@@ -392,7 +392,7 @@ const Live = (() => {
     const short = p => p === 'Fitness' ? '2-4 60' : p === 'Fitness PT' ? 'PT 60' : p.replace('Pro Coach', 'Pro').replace('Asi Coach', 'Asi');
     // Feste Spalten je Firma
     const nMon = ML[(mo.m + 1) % 12]; // Club und Akademie werden im Voraus fuer den Folgemonat berechnet
-    const extra = fitMode ? [['remote', 'Remote', 'Remote']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['pauschale', 'Vertrags&shy;kosten', 'Vertragskosten'], ['vertrag', `Monats&shy;beitrag ${nMon.slice(0, 3)}.`, `Monatsbeitrag ${nMon}`], ['turnier', 'Turnier', 'Turnierbetreuung'], ['zusatz', 'Zusatz', 'Zusatzkosten']];
+    const extra = fitMode ? [['remote', 'Remote', 'Remote'], ['rabatt', 'Rabatt', 'Rabatt']] : [['halle', 'Hallen&shy;kosten', 'Hallenkosten'], ['pauschale', 'Vertrags&shy;kosten', 'Vertragskosten'], ['vertrag', `Monats&shy;beitrag ${nMon.slice(0, 3)}.`, `Monatsbeitrag ${nMon}`], ['turnier', 'Turnier', 'Turnierbetreuung'], ['zusatz', 'Zusatz', 'Zusatzkosten'], ['rabatt', 'Rabatt', 'Rabatt']];
     const vsS = fitMode ? [] : (mo.vsStunden || []);
     const vsHtml = vsS.length ? `<section class="panel"><div class="panel-head"><h2>Vertragsspieler – gespielte Stunden ${ML[mo.m]}</h2><span class="sub">nur zur Kontrolle, wird nicht berechnet</span></div>
       <div class="tbl-wrap"><table class="shop"><thead><tr><th>Spieler</th><th class="r">Tennis h</th><th class="r">Fitness h</th><th class="r">Termine</th><th class="r">Vertrag</th></tr></thead>
@@ -434,7 +434,7 @@ const Live = (() => {
     const lexCell = r => `<td class="r lex-col">${busy[r.name] ? '<span class="chip-draft">Lege an …</span>' : lexId(r) ? lexChip(r) + (doppelt(r) ? ` <span class="ab-warn" title="In Lexoffice gibt es ${doppelt(r)} Entwürfe für diesen Kunden und Monat – bitte einen löschen">⚠ ${doppelt(r)}×</span>` : '') : isCur ? '' : unklar(r) ? `<button class="btn ghost sm warn-btn" data-lex="${esc(r.name)}" data-check="1" title="${esc(r.pruefen.join('\n'))}">⚠ prüfen</button>` : `<button class="btn ghost sm" data-lex="${esc(r.name)}">→ Lexoffice</button>`}</td>`;
     // Beträge von Hand ändern: Zelle anklicken (gespeichert im Blatt „Abrechnung-Korrekturen“)
     const isKorr = (r, k) => (r.korr || []).includes(k);
-    const editCell = (r, k, t) => `<td class="r num edit-cell${isKorr(r, k) ? ' korr' : ''}" data-edit="${k}" data-n="${esc(r.name)}" data-t="${esc(t)}" title="${isKorr(r, k) ? `von Hand geändert – berechnet: ${m2((r.basis || {})[k] || 0)}. ` : ''}Anklicken zum Ändern">${r[k] ? m2(r[k]) : ''}${isKorr(r, k) ? ' <span class="korr-mark">✎</span>' : ''}</td>`;
+    const editCell = (r, k, t) => `<td class="r num edit-cell${isKorr(r, k) ? ' korr' : ''}" data-edit="${k}" data-n="${esc(r.name)}" data-t="${esc(t)}" title="${isKorr(r, k) ? `von Hand geändert – berechnet: ${m2((r.basis || {})[k] || 0)}. ` : ''}Anklicken zum Ändern">${r[k] ? (k === 'rabatt' ? '−' : '') + m2(r[k]) : ''}${isKorr(r, k) ? ' <span class="korr-mark">✎</span>' : ''}</td>`;
     const body = rows.map((r, i) => `${i === firstPriv && i > 0 ? `<tr class="abr-sep"><td colspan="${span}">Privatkunden</td></tr>` : i === 0 && isVS(r) ? `<tr class="abr-sep"><td colspan="${span}">Vertragsspieler</td></tr>` : ''}<tr class="abr-row" data-i="${i}"><td><b>${esc(split(r.name)[0])}</b>${abMark(r)}</td><td>${esc(split(r.name)[1])}</td>${used.map(p => `<td class="r num">${unit(r.units[p])}</td>`).join('')}
         ${extra.map(([k, , t]) => editCell(r, k, t)).join('')}<td class="r num"><b>${m2(r.summe)}</b></td>${lexCell(r)}</tr>
         <tr class="abr-det" data-d="${i}" hidden><td colspan="${span}">${r.details.map(d => `${esc(d[0])} ${esc(d[1])} · ${unit(d[2])} h · ${d[3] > 1 ? d[3] + ' Pers.' : 'Einzel'} · ${esc(d[4])}`).join('<br>') || 'nur Monatsbeitrag'}${(r.pruefen || []).map(x => `<br><span class="ab-warn">⚠ Bitte prüfen: ${esc(x)}</span>`).join('')}${abOf(r).map(x => `<br><span class="ab-warn">⚠ ${esc(abText(x))}</span>`).join('')}</td></tr>`).join('');
@@ -480,6 +480,7 @@ const Live = (() => {
         ['Monatsbeitrag Akademie', sumOf(r => r.vertrag || 0), `${nMon} · Vertragsspieler`], ['Vertragskosten', sumOf(r => r.pauschale || 0), `Jahrespauschalen · Vertragsbeginn ${nMon}`],
         ['Club', sumOf(r => r.club || 0), `Monatsbeitrag ${nMon} · Serienrechnung`],
         ['Turnierbetreuung', sumOf(r => r.turnier || 0), `${ML[mo.m]} · laut Turnierliste ${m2(Math.round(tbSum * 100) / 100)}${tbOffen ? ` · ${tbOffen}× ohne Betrag` : ''}`]];
+    if (!fitMode && sumOf(r => r.rabatt || 0)) ov.push(['Rabatt', -sumOf(r => r.rabatt || 0), `${ML[mo.m]} · von Hand`]);
     if (!fitMode) ov.push(['Gesamt', Math.round(ov.reduce((s, x) => s + x[1], 0) * 100) / 100, `${ML[mo.m]} / ${nMon}`]);
     const ovHtml = `<section class="panel"><div class="panel-head"><h2>Monatsübersicht</h2><span class="sub">für die Finanzübersicht · alle Kunden</span></div>
       <section class="tiles">${ov.map(([l, v, s]) => `<article class="tile"><div class="label">${l}</div><div class="value num">${m2(v)}</div><div class="what">${s}</div></article>`).join('')}</section></section>`;
@@ -509,7 +510,7 @@ const Live = (() => {
           <tr class="price"><th>Preis je Einheit</th><th></th>${used.map(p => `<th class="r">${mo.prices[p] !== undefined ? m2(mo.prices[p]) : '?'}</th>`).join('')}${'<th></th>'.repeat(extra.length + 2)}</tr></thead>
         <tbody>${body || `<tr><td colspan="${span}" class="sub">Keine Einträge.</td></tr>`}</tbody>
         <tfoot><tr class="sum"><td>Summe Einheiten</td><td></td>${used.map(p => `<td class="r num">${unit(unitsSum(p))}</td>`).join('')}${'<td></td>'.repeat(extra.length + 2)}</tr>
-          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}${extra.map(([k]) => `<td class="r num">${m2(rows.reduce((s, r) => s + (r[k] || 0), 0))}</td>`).join('')}<td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
+          <tr class="sum"><td>Wert pro Produkt</td><td></td>${used.map(p => `<td class="r num">${m2(unitsSum(p) * (mo.prices[p] || 0))}</td>`).join('')}${extra.map(([k]) => `<td class="r num">${k === 'rabatt' && rows.some(r => r.rabatt) ? '−' : ''}${m2(rows.reduce((s, r) => s + (r[k] || 0), 0))}</td>`).join('')}<td class="r num"><b>${m2(rows.reduce((s, r) => s + r.summe, 0))}</b></td><td></td></tr></tfoot></table></div></section>
       ${abHtml}
       ${vsHtml}
       ${hinw.length ? `<section class="panel"><h2>Bitte prüfen</h2><ul class="hint-list">${hinw.map(h => `<li>${esc(h)}</li>`).join('')}</ul></section>` : ''}
@@ -524,7 +525,7 @@ const Live = (() => {
       const k = td.dataset.edit, r = mo.rows.find(x => x.name === td.dataset.n && (x.tab === 'fitness') === fitMode);
       if (!r || td.dataset.busy) return;
       const basis = isKorr(r, k) ? (r.basis || {})[k] || 0 : r[k] || 0;
-      const ein = window.prompt(`${td.dataset.t} für ${r.name} (${ML[mo.m]} ${mo.y})\n\nBetrag in € eingeben. Leer lassen = berechneter Wert (${m2(basis)}).`, r[k] ? String(r[k]).replace('.', ',') : '');
+      const ein = window.prompt(`${td.dataset.t} für ${r.name} (${ML[mo.m]} ${mo.y})\n\n${k === 'rabatt' ? 'Rabatt in € eingeben (wird von der Rechnung abgezogen). ' : 'Betrag in € eingeben. '}Leer lassen = berechneter Wert (${m2(basis)}).`, r[k] ? String(r[k]).replace('.', ',') : '');
       if (ein === null) return;
       const t = ein.trim().replace(/\s|€/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.');
       if (t !== '' && !(+t >= 0)) return toast('Bitte einen Betrag eingeben, z. B. 65 oder 1.950,00');
